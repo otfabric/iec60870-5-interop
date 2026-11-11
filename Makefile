@@ -44,7 +44,7 @@ adapter_of = $(word 2,$(subst -, ,$(1)))
 
 export REGISTRY VERSION
 
-.PHONY: help all ci validate documents lint images smoke smoke-iec101 smoke-iec104 interop interop-iec101 \
+.PHONY: publish-arch publish-manifest digests help all ci validate documents lint images smoke smoke-iec101 smoke-iec104 interop interop-iec101 \
         interop-iec104 buildx buildx-setup publish capabilities clean FORCE
 FORCE:
 
@@ -147,7 +147,7 @@ buildx: ## Build every image for $(PLATFORMS) under emulation, without pushing
 			--file adapters/$$std/$$a/Dockerfile . || exit 1; \
 	done
 
-publish: ## Build and push multi-arch images (requires VERSION=vX.Y.Z; not used before the first release)
+publish: ## Build and push multi-arch images under emulation (requires VERSION=vX.Y.Z; the Release workflow uses publish-arch instead)
 	@if ! echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 		echo "Error: VERSION must be in the form v<major>.<minor>.<patch>"; exit 1; fi
 	@for i in $(IMAGES); do \
@@ -155,6 +155,37 @@ publish: ## Build and push multi-arch images (requires VERSION=vX.Y.Z; not used 
 		$(RETRY) docker buildx build $(builder_flag) --platform $(PLATFORMS) --push \
 			--build-arg BASE_REGISTRY=$(BASE_REGISTRY) --build-arg ADAPTER_VERSION=$(VERSION) \
 			--tag $(call image,$$i):$(VERSION) --file adapters/$$std/$$a/Dockerfile . || exit 1; \
+	done
+
+ARCH  ?= $(shell docker version --format '{{.Server.Arch}}' 2>/dev/null)
+ARCHS ?= amd64 arm64
+
+publish-arch: ## Push the local images of this machine as <image>:$(VERSION)-$(ARCH) (build and self-test them first)
+	@if ! echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "Error: VERSION must be in the form v<major>.<minor>.<patch>"; exit 1; fi
+	@for i in $(IMAGES); do \
+		got=$$(docker image inspect --format '{{.Architecture}}' $(call image,$$i):$(VERSION)) || exit 1; \
+		if [ "$$got" != "$(ARCH)" ]; then echo "Error: $$i:$(VERSION) is $$got, not $(ARCH)"; exit 1; fi; \
+		echo "Pushing $$i $(VERSION) for linux/$(ARCH)..."; \
+		docker tag $(call image,$$i):$(VERSION) $(call image,$$i):$(VERSION)-$(ARCH) || exit 1; \
+		$(RETRY) docker push --quiet $(call image,$$i):$(VERSION)-$(ARCH) || exit 1; \
+	done
+
+publish-manifest: ## Join the per-architecture images of VERSION into the multi-arch <image>:$(VERSION)
+	@for i in $(IMAGES); do \
+		echo "Creating $$i $(VERSION) from: $(ARCHS)"; \
+		$(RETRY) docker buildx imagetools create --tag $(call image,$$i):$(VERSION) \
+			$(foreach arch,$(ARCHS),$(call image,$$i):$(VERSION)-$(arch)) || exit 1; \
+		for arch in $(ARCHS); do \
+			$(RETRY) docker buildx imagetools inspect $(call image,$$i):$(VERSION) --format '{{json .Manifest}}' \
+				| tr -d ' \n' | grep -q "\"architecture\":\"$$arch\"" || { echo "Error: $$i:$(VERSION) has no linux/$$arch image"; exit 1; }; \
+		done; \
+	done
+
+digests: ## Print "<standard>-<adapter> <digest>" of the published multi-arch images of VERSION
+	@for i in $(IMAGES); do \
+		d=$$($(RETRY) docker buildx imagetools inspect $(call image,$$i):$(VERSION) --format '{{.Manifest.Digest}}') || exit 1; \
+		echo "$$i $$d"; \
 	done
 
 # ── Clean ─────────────────────────────────────────────────────────────────────

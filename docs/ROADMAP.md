@@ -26,8 +26,8 @@ assessed in [REFERENCE_STACKS.md](REFERENCE_STACKS.md). Nothing here is done.
 
 ## IEC 60870-5-104
 
-- Carry over from iec104-interop: the release workflow (native multi-arch,
-  `manifest.json`), the Upstream workflow and `candidate-*` targets, the
-  `run-*` targets, and an `own/` image (ADR-0012).
+- Carry over from iec104-interop: the Upstream workflow and `candidate-*`
+  targets, the `run-*` targets, and an `own/` image (ADR-0012). (The
+  release workflow is carried over in v0.1.0.)
 - Publish the images under the new names; consumers move from
   `iec104-interop-<stack>` to `iec60870-5-interop-iec104-<stack>`.
