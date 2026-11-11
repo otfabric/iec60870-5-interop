@@ -79,6 +79,24 @@ the standard. No open stack offers a standard-conforming IEC 103 secondary
 station; the ARIEC103 simulator is the second independent server on the wire
 but not fixture-driven ([ROADMAP.md](ROADMAP.md)).
 
+Generic services (ASDU 10, 11, 21) and disturbance data (ASDU 23 to 31),
+read again in the pinned sources for contract 2.3 (2026-11-11; file and line
+references in [CAPABILITIES.md](CAPABILITIES.md#features-of-the-iec-103-images)):
+
+| Stack | Generic services | Disturbance data |
+|-------|------------------|------------------|
+| vitusdong | master and slave (read of entries, write; every generic ASDU with INF 0) | master (list, a procedure of its own that is not clause 7.4.7's, tags separately) and slave (list, records with generated values and the station's indications as tags) |
+| ARIEC103 | no | no (type 23 named in its decoder only) |
+| Open103 | no (`GenericService()` returns false) | master: the procedure of clause 7.4.7 driven by the ASDU 23 the station sends, after the GI; NFE of ASDU 30 read through an unpacked struct (known bug); `DisturbanceData` lacks a return for most types (undefined behaviour the shim avoids) |
+| go-iecp5 cs103 | no (type identifications only) | no ("not implemented by this package") |
+
+vitusdong and ARIEC103 are not independent of each other (vitusdong's tests
+use a copy of ArIEC103 as their oracle), but ARIEC103 has neither function,
+so that does not touch the evidence of contract 2.3. Open103, judged usable
+only in part for the basic functions, is usable for the transmission of
+disturbance data as a control system: it ran the whole procedure against an
+independent protection equipment (the consumer run in COMPATIBILITY.md).
+
 ## Passive decoding oracle
 
 Wireshark (`epan/dissectors/packet-iec104.c`, master `55b5def4`) dissects

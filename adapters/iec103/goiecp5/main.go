@@ -136,8 +136,13 @@ func printCapabilities() int {
 			"identification":            true,
 			"measurands":                true,
 			"broadcastClockSync":        false,
-			"genericServices":           false,
-			"disturbanceData":           false,
+			// cs103 defines the type identifications 10, 11, 21 and 23..31
+			// but builds and decodes none of them (asdu.go: "Disturbance
+			// data transfer (not implemented by this package)").
+			"genericServices":       false,
+			"disturbanceList":       false,
+			"disturbanceData":       false,
+			"disturbanceDataServer": false,
 		},
 		"pointTypes":       []string{},
 		"commandTypes":     []string{},

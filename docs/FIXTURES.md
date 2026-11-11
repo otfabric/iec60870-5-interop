@@ -399,6 +399,8 @@ exits 4 on a violation.
 | `indications[]` | `fun` 0..254 and `inf`, unique together; `dpi` 0..3 (1 off, 2 on); `gi` false keeps it out of the general interrogation (default true) |
 | `measurands[]` | `fun`, `inf` (unique with the indications), `type` 3 (measurands I, at most four values) or 9 (measurands II, at most nine), `values[]`: `value` -4096..4095 (the 13-bit value), `ov`, `er` (default false) |
 | `commands[]` | `fun`, `inf`: a general command the device takes, acting on the indication with the same function type and information number, which must exist. For a function type of a compatible range, INF 19 and 23..26 take ON only (table 17, COM) |
+| `generic[]` | Contract 2.3. A generic entry (clause 7.4.8): `gin` `{group, entry}` (1..255 each, unique), `description` (the text of KOD 10, printable ASCII), `type` the GDD data type (1 ASCII, 3 unsigned integer, 4 integer, 7 R32.23), `size` its DATASIZE (the number of characters; 1, 2 or 4; 4), `value` (the text, an integer that fits, or a number exact in single precision), `writable` (default false) |
+| `disturbances[]` | Contract 2.3. A recorded disturbance (clause 7.4.7), at most eight: `fan` (unique), `sof` `{tp, tm, test, otev}` (default false), `time` the fault (ASDU 23, `2026-01-02T03:04:05.678Z`), `nof`, `interval` (INT, µs), `start` the time of day of the first value (ASDU 26, `HH:MM:SS.mmm`), `tags[]` `{pos, fun, inf, dpi}` in ascending position, the initial states at position 0 first, `channels[]` `{acc, rpv, rsv, rfa, values}` in ascending ACC, every channel with the same number of values (NOE), each -32768..32767 |
 
 ### Station behaviour (IEC 103)
 
@@ -418,6 +420,17 @@ with every connection.
 | ASDU 6 (clock synchronization), addressed | ACK; sets the station's clock; queues ASDU 6, cause 8, FUN 255, INF 0 with the new time |
 | ASDU 6 to link address 255 (SEND/NO REPLY) | Sets the clock; no answer |
 | ASDU 20 (general command) | ACK. A command of the fixture with DCO 1 (OFF) or 2 (ON) that the COM column of table 17 allows (for a function type of a compatible range, INF 19 and 23..26 take ON only; clause 7.2.6.4): the indication's DPI becomes the DCO, and the station queues ASDU 1, cause 20 (positive acknowledgement), the command's FUN and INF, SIN the RII; then, when the DPI changed, ASDU 1, cause 12 (remote operation), the FUN and INF, the new DPI, SIN 0 (clause 7.4.4, figure 7). Anything else (a FUN/INF that is no command of the fixture, DCO 0 or 3, OFF where table 17 allows only ON, a command before the previous one was acknowledged): nothing changes, ASDU 1, cause 21 (negative acknowledgement), the command's FUN and INF, SIN the RII, and no cause 12 report |
+
+Contract 2.3 adds the generic services and the transmission of disturbance
+data:
+
+| Request | Answer |
+|---------|--------|
+| ASDU 21, cause 42, FUN 254, INF 244 (read a single entry), GIN and KOD | ACK; ASDU 10, cause 42, FUN 254, INF 244, the RII, CONT 0: KOD 1 the entry's value with its data type and size (NUMBER 1), KOD 10 its description (type 1). An entry the device lacks or another KOD: cause 43 with the GIN, the KOD and a generic reply code (type 22): 1 (GIN not defined), 2 (data do not exist) (clause 7.4.8.6.2) |
+| ASDU 10, cause 40, FUN 254, INF 250 (write with execution) | ACK. When every data set is KOD 1 to a writable entry with its data type and size and NUMBER 1, the values are set and ASDU 10, cause 40, INF 250, the RII and no data sets follows; otherwise nothing is set and cause 41 follows with the GIN, KOD and a reply code of each failed set: 1 (GIN not defined), 8 (read only), 5 (another type, size or KOD) (clause 7.4.8.6.3, figure 17). The values live as long as the process |
+| ASDU 24, cause 31, TOO 24 | ACK; ASDU 23, cause 31, the device's function type, VSQ with SQ 0 and the number of records, FAN, SOF and the time of each (clause 7.3.1.11) |
+| ASDU 7 (general interrogation) | Also: after the termination, ASDU 23 as above (clause 7.4.7: the list is sent after the start of a general interrogation, with cause 31) |
+| ASDU 24 TOO 1, 2, 16, 8 and ASDU 25 TOO 68, 66, 64, 65 | The procedure of clause 7.4.7 (figure 10) with the fixture's record: ASDU 26 (the not used octet 0, TOV 1, FAN, NOF, NOC, NOE, INT, `start`), ASDU 28, ASDUs 29 (the tags of one position each, at most 25), ASDU 31 TOO 38, each channel offered by ASDU 27 after the acknowledgement of the tags or of the previous channel, its values in ASDUs 30 of at most 25 (NFE the number of the first value of the ASDU, the first value of the channel being number 0), ASDU 31 TOO 35, and after the last channel ASDU 31 TOO 32; after the final acknowledgement the list again. The record stays. An order that does not fit the transfer in progress: ASDU 31 TOO 34. All with the device's function type and cause 31, as class 1 data |
 
 The DPI of an acknowledgement (cause 20 or 21) is not significant (the notes
 to clauses 7.3.1.1 and 7.3.1.2), and SIN only with causes 9, 20 and 21
@@ -455,6 +468,18 @@ in the control direction (clause 7.2.5.2).
 Measurands, class 2: 160/144 (ASDU 3, one value 2048), 160/145 (ASDU 3, 1024
 and -512 with OV), 160/148 (ASDU 9, nine values: 100, 200, 300, 3000, 3001,
 2999, -4096, 4095 with OV, 0 with ER).
+
+Generic data (group 1): 1.1 `RATED I` unsigned 2 octets 1000, read only;
+1.2 `PICKUP I>` R32.23 1.5, writable; 1.3 `DELAY t>` unsigned 2 octets 300,
+writable; 1.4 `FEEDER` ASCII 8 characters `FEEDER 1`, read only; 1.5
+`OFFSET` integer 2 octets -20, read only.
+
+Recorded disturbance FAN 7: TP (with trip), fault at
+2026-10-09T15:30:00.012Z, NOF 3, INT 1000 µs, first value at 15:30:00.000;
+tags 160/84 (general start) and 160/90 (trip I>) off at position 0, 160/84
+on at 12, 160/90 on at 20; channels ACC 1 (IL1) and 2 (IL2), RPV 600, RSV
+1, RFA 1, 40 values each (a sine of 20 values per period whose amplitude
+grows from 6000 to 21000 at value 12), so every channel takes two ASDUs 30.
 
 ## IEC 102
 

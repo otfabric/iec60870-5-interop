@@ -53,7 +53,7 @@ docker stop station && docker network rm iec101-demo
 
 | Topic | Where |
 |-------|-------|
-| Container contract 2.2: commands, link flags, documents, exit codes | [docs/CONTAINER_CONTRACT.md](docs/CONTAINER_CONTRACT.md) |
+| Container contract 2.3: commands, link flags, documents, exit codes | [docs/CONTAINER_CONTRACT.md](docs/CONTAINER_CONTRACT.md) |
 | What each image can do | [docs/CAPABILITIES.md](docs/CAPABILITIES.md) |
 | Fixtures and station behaviour | [docs/FIXTURES.md](docs/FIXTURES.md) |
 | Self-test results, exact counts | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) |
