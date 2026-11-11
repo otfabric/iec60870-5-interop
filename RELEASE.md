@@ -18,6 +18,18 @@ section per version, newest first, each ending with a `---` line.
 
 ---
 
+## v0.2.1
+
+**Date:** 2026-11-11
+**Previous release:** v0.2.0
+
+- Publishes `iec103-goiecp5` (riclolsen/go-iecp5 v0.4.7 cs103, client),
+  validated in v0.2.0 but held back then: its LICENSE file says LGPL-3.0,
+  its README and file headers GPL-3.0; either allows the GPL-3.0-or-later
+  image, and the maintainer decided to publish it. `UNPUBLISHED` is empty.
+
+---
+
 ## v0.2.0
 
 **Date:** not released (prepared 2026-11-11)

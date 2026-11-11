@@ -34,10 +34,6 @@ ariec103, open103 clients). Next:
    behind a fixture (its model is fixed in code, so this needs a change
    upstream or a different simulator); dscsystems/rs-iec60870-5 has no
    secondary.
-2. **goiecp5 licence**: the maintainer decides between the LICENSE file
-   (LGPL-3.0) and the README and file headers (GPL-3.0) of riclolsen/go-iecp5;
-   then the image moves from proposed and joins the published set
-   (`UNPUBLISHED` in the Makefile).
 3. **Generic services and disturbance data** (ASDU 10/11/21, 23..31):
    operations `generic-read` and `disturbance-list`/`disturbance-get`, a
    `generic` and a `disturbances` part of the fixture. Only vitusdong has both

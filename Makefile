@@ -42,7 +42,7 @@ LINK_MODES ?= unbalanced balanced
 IMAGES := $(addprefix iec101-,$(IEC101_ADAPTERS)) $(addprefix iec103-,$(IEC103_ADAPTERS)) $(addprefix iec104-,$(IEC104_ADAPTERS))
 # Built and tested, not published: the licence of riclolsen/go-iecp5 is not
 # settled (versions.yaml, iec103-goiecp5).
-UNPUBLISHED ?= iec103-goiecp5
+UNPUBLISHED ?=
 PUBLISHED := $(filter-out $(UNPUBLISHED),$(IMAGES))
 
 image = $(REGISTRY)/iec60870-5-interop-$(1)

@@ -16,7 +16,7 @@ images; nothing in this repository knows about any such consumer.
 | IEC 60870-5-101 | `iec101-lib60870` (lib60870-C v2.4.1), `iec101-cbsigma` (cB-Sigma/iec60870 v0.3.0) | validated locally: smoke and the cross-stack run, unbalanced and balanced ([COMPATIBILITY](docs/COMPATIBILITY.md)) |
 | IEC 60870-5-104 | `iec104-lib60870`, `iec104-openmuc`, `iec104-wendy512`, `iec104-cbsigma`, `iec104-part5` (from iec104-interop 0.6.0) | experimental: built and self-tested here ([COMPATIBILITY](docs/COMPATIBILITY.md)), not yet released from this repository |
 | IEC 60870-5-102 | none | survey only ([REFERENCE_STACKS](docs/REFERENCE_STACKS.md)) |
-| IEC 60870-5-103 | `iec103-vitusdong` (vitusdong/iec103-dotnet v0.1.0, server and client), `iec103-ariec103` (masarray/ARIEC103, client), `iec103-open103` (XVincentX/Open103, client), `iec103-goiecp5` (riclolsen/go-iecp5 v0.4.7 cs103, client; not published until its licence is settled) | validated locally, unbalanced, every client against the one server; the server deviates from the standard in every checked reply (known bugs, [COMPATIBILITY](docs/COMPATIBILITY.md#iec-60870-5-103)) |
+| IEC 60870-5-103 | `iec103-vitusdong` (vitusdong/iec103-dotnet v0.1.0, server and client), `iec103-ariec103` (masarray/ARIEC103, client), `iec103-open103` (XVincentX/Open103, client), `iec103-goiecp5` (riclolsen/go-iecp5 v0.4.7 cs103, client) | validated locally, unbalanced, every client against the one server; the server deviates from the standard in every checked reply (known bugs, [COMPATIBILITY](docs/COMPATIBILITY.md#iec-60870-5-103)) |
 
 ## How the serial standards are carried
 

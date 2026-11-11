@@ -172,7 +172,7 @@ THIRD_PARTY_NOTICES.md), `/licenses/nuget/` and `/licenses/dotnet-runtime-*`.
 Licence texts in the image: `/licenses/XVincentX-Open103/LICENSE` and
 `/licenses/dotnet-runtime-*`.
 
-## Image `iec60870-5-interop-iec103-goiecp5` (built, not published)
+## Image `iec60870-5-interop-iec103-goiecp5`
 
 | Component | Version | Licence | Source |
 |-----------|---------|---------|--------|

@@ -11,7 +11,7 @@
 #         validated    smoke and the cross-stack run passed locally, results in
 #                      docs/COMPATIBILITY.md (and reports/ when kept)
 
-interop_version: "0.2.0"
+interop_version: "0.2.1"
 contract_version: "2.1"        # docs/CONTAINER_CONTRACT.md
 fixture_schema: "1.0"          # fixtures/schema/iec60870-5-fixture.schema.json, iec60870-5-103-fixture.schema.json
 
@@ -108,7 +108,7 @@ implementations:
 
   iec103-goiecp5:
     standard: iec103
-    status: proposed
+    status: validated
     upstream: "riclolsen/go-iecp5 (package cs103)"
     repository: "https://github.com/riclolsen/go-iecp5"
     module: "github.com/riclolsen/go-iecp5"
@@ -120,11 +120,11 @@ implementations:
     roles: [client]
     link_modes: [unbalanced]
     note: >-
-      Built and run here (smoke and cross-stack passed, docs/COMPATIBILITY.md),
-      held at proposed and out of the published images until the maintainer
-      settles the licence: the LICENSE file is LGPL-3.0, the README and the
-      file headers of cs103 say GPL-3.0. A primary station only, with its own
-      TCP transport; no SEND/NO REPLY (broadcast).
+      Smoke and cross-stack passed (docs/COMPATIBILITY.md). The LICENSE file
+      is LGPL-3.0, the README and the file headers of cs103 say GPL-3.0;
+      either allows the GPL-3.0-or-later image, which the maintainer decided
+      to publish (2026-11-11). A primary station only, with its own TCP
+      transport; no SEND/NO REPLY (broadcast).
 
   iec103-ariec103:
     standard: iec103
