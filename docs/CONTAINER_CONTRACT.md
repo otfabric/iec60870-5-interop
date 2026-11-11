@@ -1,6 +1,6 @@
 # Container contract
 
-Version: **2.2** (`contract_version` in [versions.yaml](../versions.yaml))
+Version: **2.3** (`contract_version` in [versions.yaml](../versions.yaml))
 
 Every adapter image exposes the same commands, flags, JSON documents and exit
 codes, for each standard of the IEC 60870-5 family it implements. Consumers
@@ -14,6 +14,7 @@ a reader of 1.3 documents reads 2.0 documents unchanged.
 
 | Version | Change |
 |---------|--------|
+| 2.3 | [IEC 101](#field-sizes): the field sizes of a run are selectable and declared. Capability documents of IEC 101 have `linkAddressSizes`, `cotSizes`, `caSizes` and `ioaSizes` (the sizes the image takes; a size it does not list is a usage error) and the feature `unbalancedCommonAddress`; the server's `ready` event has `linkAddressSize`, `cotSize`, `caSize` and `ioaSize`; a run selects the sizes by giving the same link flags to server and client ([field sizes](#field-sizes)). The image `iec101-digitalpetri` (digitalpetri/iec60870) |
 | 2.2 | [IEC 102](#iec-102): unbalanced only, link address and common address of two octets by default (`--link-address-size`, `--ca-size`), `--profile standard\|ree` and `--access-key` (the REE session C_AC_NA_2 / C_FS_NA_2 around every operation, `session` in results, the error `login-refused`); the client operations `connect`, `read-totals` (`--kind`, `--record`, `--from`, `--to`, `--first`, `--last`), `read-time`, `read-product`, `set-time` (`--time`), `read-tariff` (`--register`, `--from`, `--to`); ASDU documents of IEC 102 (`record`, local times a and b with `su`, integrated totals with the quality octet, tariff records); confirmations with the causes 13..18; the server events of IEC 102; `linkAddressSizes`, `caSizes`, `profiles` and the IEC 102 features in capability documents; the IEC 102 fixture. The image `iec102-gisce` (client only) |
 | 2.1 | [IEC 103](#iec-103): unbalanced only, a one-octet link address, no information object addresses; the client operations `connect`, `interrogate` (`--scn`), `clock-sync` (`--broadcast`), `command` (`--fun`, `--inf`, `--dco`, `--rii`), `monitor`; ASDU documents of IEC 103 (`fun`, `inf`, `dpi`, `sin`, `time32`, `values`, ...), `asduTypes` and the IEC 103 features in capability documents; confirmations with causes 8, 20 and 21; server events of IEC 103. An image may be a client only (`roles.server` false): `server` is then a usage error |
 | 2.0 | One repository for the IEC 60870-5 family (`iec60870-5-interop`, from `iec104-interop` 0.6.0, contract 1.3). Image `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`; entrypoint `/usr/local/bin/iec60870-5-interop`; readiness file `/run/iec60870-5-interop/ready`. `standard` in capability documents (and `transport`, `linkModes` for the serial standards). [IEC 101, 102 and 103](#iec-101-102-and-103): the FT 1.2 byte stream over one TCP connection, port 2401, the [link flags](#link-flags), the error `link-init-timeout`, results without `startdtConfirmed`; C_TS_NA_1 in ASDU documents (`fbp`). IEC 104 is contract 1.3 under the new names |
@@ -33,6 +34,7 @@ What a *station* does with a request is defined by its fixture: see
 
 - [Standards and images](#standards-and-images)
 - [IEC 101, 102 and 103](#iec-101-102-and-103)
+  - [Field sizes](#field-sizes)
 - [IEC 103](#iec-103)
 - [IEC 102](#iec-102)
 - [Image layout](#image-layout)
@@ -59,7 +61,7 @@ What a *station* does with a request is defined by its fixture: see
 An image implements one standard with one stack:
 `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`, for example
 `iec60870-5-interop-iec101-lib60870` and `iec60870-5-interop-iec104-lib60870`.
-Images of this version: IEC 101 `lib60870`, `cbsigma`; IEC 102 `gisce`
+Images of this version: IEC 101 `lib60870`, `cbsigma`, `digitalpetri`; IEC 102 `gisce`
 (client); IEC 103 `vitusdong` (server and client), `goiecp5`, `ariec103`,
 `open103` (clients); IEC 104 `lib60870`, `openmuc`, `wendy512`, `cbsigma`,
 `part5`.
@@ -121,6 +123,32 @@ does not fit is a usage error. `--originator-address` is sent only with
 There are no APCI, TLS, security or redundancy flags for the serial
 standards: they are unknown flags (exit 2).
 
+### Field sizes
+
+IEC 101 (contract 2.3). IEC 60870-5-101 leaves the sizes of the link address
+field, the cause of transmission, the common address and the information
+object address to the system (the interoperability list, clause 8 of IEC
+60870-5-101); nothing on the wire says which a station
+uses, so both ends are configured alike.
+
+- A run selects them with the [link flags](#link-flags) `--link-address-size`,
+  `--cot-size`, `--ca-size` and `--ioa-size` (and `--link-address`), given
+  with the **same values to the server and to every client** of the run.
+- The capability document lists the sizes the image takes, in
+  `linkAddressSizes` (a subset of `[0, 1, 2]`), `cotSizes` (`[1, 2]`),
+  `caSizes` (`[1, 2]`) and `ioaSizes` (`[1, 2, 3]`). A size it does not list
+  is a usage error (exit 2) of `server` and `client`; so is a size the
+  contract does not have, and `--link-address-size 0` in unbalanced mode.
+- A pairing can run a set of sizes when both images list every size of it.
+  The broadcast common address follows `--ca-size` (255 or 65535); with two
+  octets 255 is an ordinary address.
+
+A feature says what an image cannot do with a set of sizes:
+
+| Feature | Meaning when false |
+|---------|--------------------|
+| `unbalancedCommonAddress` | Client, unbalanced mode: a request whose common address is not `--link-address` is a usage error, since the library sends an ASDU to the station whose link address equals its common address (and one with the broadcast common address to all stations, unconfirmed). `connect` and `monitor` send no ASDU and are not affected |
+
 > The flag is `--link-mode`, not `--mode`: the `command` operation has had
 > `--mode direct|select|sbo|cancel` since contract 1.0, and a client takes the
 > link flags and the operation flags on one command line.
@@ -133,7 +161,9 @@ for IEC 104 ([`server`](#server), [FIXTURES.md](FIXTURES.md)), with these
 differences:
 
 - The `ready` event has `standard`, `mode` (the link mode) and `linkAddress`
-  besides `adapter`, `address`, `fixture` and `commonAddress`.
+  besides `adapter`, `address`, `fixture` and `commonAddress`; IEC 101 (2.3)
+  also `linkAddressSize`, `cotSize`, `caSize` and `ioaSize`, the field sizes
+  the station runs with.
 - Events: `ready`, `connection-opened`, `connection-closed` (the TCP
   connection), `interrogation`, `counter-interrogation`, `read`, `clock-sync`,
   `command`, `stopped`. No `data-transfer-*` events (`dataTransferEvents` is
@@ -183,8 +213,9 @@ differences:
 
 `standard` (`iec60870-5-101`, ...), `transport` (`tcp-stream`) and
 `linkModes` (the modes the self-tests exercise) are required for a serial
-standard. `protocol` has the value of `standard`. The features `unbalancedMode`,
-`balancedMode` and `distinctBalancedAddresses` are added; the IEC 104-only
+standard, and for IEC 101 (2.3) the size lists of [field sizes](#field-sizes). `protocol` has the value of `standard`. The features `unbalancedMode`,
+`balancedMode` and `distinctBalancedAddresses` are added, and for IEC 101 (2.3)
+`unbalancedCommonAddress`; the IEC 104-only
 features (`apciParameters`, `tls*`, `file*`, `redundancy*`,
 `secureAuthentication`, `dataTransferEvents`, `multipleConnections`,
 `timeTaggedCommands`) are present and false. See [CAPABILITIES.md](CAPABILITIES.md).

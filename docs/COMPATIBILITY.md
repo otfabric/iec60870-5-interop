@@ -18,6 +18,68 @@ otherwise identical sources.
 
 ## IEC 60870-5-101
 
+### Contract 2.3: three stacks, field sizes (2026-11-11)
+
+Run on the `:dev` images of all three IEC 101 adapters built from the
+branch of contract 2.3 (interop_version 0.4.0, not released), on
+linux/arm64. Documents were not kept (`make documents` was not run for this
+change), so the counts are those `scripts/interop.sh` and `scripts/smoke.sh`
+printed. The three IEC 101 capability documents (kept by a smoke run with
+`REPORT_DIR`) and eleven client result documents of digitalpetri (every
+operation, and a link that does not start) validate against `schemas/`
+(`scripts/validate-documents.py`, 0 errors).
+
+| Run | Command | pass | fail | other |
+|-----|---------|-----:|-----:|------:|
+| smoke lib60870, cbsigma, digitalpetri, each link mode | `make smoke-iec101` | 6 x 48 | 0 | 0 |
+| cross-stack, unbalanced | `LINK_MODE=unbalanced scripts/interop.sh iec101 lib60870 cbsigma digitalpetri` | 1064 | 0 | 45 unsupported |
+| cross-stack, balanced | `LINK_MODE=balanced scripts/interop.sh iec101 lib60870 cbsigma digitalpetri` | 913 | 0 | 64 known-difference |
+
+Nine pairings on the 64 cases of `tests/iec101/cases.tsv` (31 with the
+default field sizes, 33 `case.fields-*`), plus the value and session checks.
+
+- **Unsupported (unbalanced, 45):** digitalpetri's client on the cases whose
+  request carries a common address other than the link address (255, 7,
+  65535, 255 with two octets, link address 300 with common address 1:
+  6 cases x 3 servers; `unbalancedCommonAddress` false), and the three
+  `case.fields-0112.*` cases (no link address field, balanced only) for all
+  nine pairings.
+- **Known difference (balanced, 64):** every case, value and session check of
+  cbsigma's client against digitalpetri's server that sends an ASDU
+  (`digitalpetri-balanced-server-no-link-reset` in
+  `tests/iec101/known-bugs.tsv`). A balanced digitalpetri station never
+  initializes its own primary direction: frames of the run (IEC101_TRACE=1,
+  cbsigma client, digitalpetri server, one-octet link address 1):
+
+  ```text
+  <- 10 c9 01 ca 16                       request status of link (9)
+  -> 10 0b 01 0c 16                       status of link (11)
+  <- 10 c0 01 c1 16                       reset of remote link (0)
+  -> e5                                   ACK
+  <- 68 09 09 68 f3 01 64 01 06 01 00 00 14 74 16   C_IC_NA_1 act, FCB 1
+  -> e5                                   ACK
+  -> 68 09 09 68 73 01 64 01 07 01 00 00 14 f5 16   C_IC_NA_1 actcon, FCV 1, FCB 1, no status/reset before it
+     (repeated three times, no answer; the line is closed)
+  ```
+
+  IEC 60870-5-101:2003 clause 6 (balanced transmission, figures 8 and 9)
+  has each station reset the other's link before user data: the primary
+  sends request status of link and reset of remote link, and a secondary
+  that was not reset answers only those two. cB-Sigma's secondary keeps
+  that state and ignores the data, and so does the client of go-iec60870-5
+  (a consumer, in its suite against the same image); lib60870-C and digitalpetri accept user
+  data on a secondary that was never reset, so their pairings with a
+  digitalpetri station pass. The library code is
+  `BalancedEngine` (only the CLIENT role runs the bring-up).
+- digitalpetri's client and server agree with lib60870-C and cB-Sigma on
+  every other case in both modes, including all field-size cases: two-octet
+  link address (also 300), cause with originator address, common address
+  (broadcast 65535; 255 an ordinary address), three-octet object address
+  (70000 refused with cause 47), and the balanced line without a link address
+  field.
+
+### Contract 2.2: two stacks (2026-11-11)
+
 | Run | Command | pass | fail | other |
 |-----|---------|-----:|-----:|------:|
 | smoke lib60870, unbalanced | `LINK_MODE=unbalanced scripts/smoke.sh iec101 lib60870` | 46 | 0 | 0 |
@@ -55,13 +117,13 @@ address with a three-octet object address; a link that does not start
 ### Not shown by these runs
 
 - The pair is not two fully independent oracles: cB-Sigma's IEC 101 link was
-  debugged against lib60870-C (docs/REFERENCE_STACKS.md). A third peer
-  (digitalpetri) is planned.
+  debugged against lib60870-C (docs/REFERENCE_STACKS.md). digitalpetri is
+  the third peer since contract 2.3 (above).
 - Non-default field sizes were not run across stacks, only each adapter
-  against itself.
+  against itself (they are since contract 2.3, above).
 - Balanced mode with distinct link addresses (`--remote-link-address` other
   than `--link-address`): cbsigma cannot, and no lib60870 pairing ran it.
-- `--link-address-size 0` was not run.
+- `--link-address-size 0` was not run (it is since contract 2.3).
 - Interrogation groups and qualities on M_BO_NA_1 have no IEC 101 fixture yet.
 
 ### Observations

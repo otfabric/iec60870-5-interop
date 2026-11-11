@@ -45,6 +45,14 @@ int printCapabilities(void)
     cJSON_AddStringToObject(c, "standard", STANDARD);
     cJSON_AddStringToObject(c, "transport", "tcp-stream");
     cJSON_AddItemToObject(c, "linkModes", cJSON_CreateStringArray(modes, 2));
+    /* Contract 2.3: every field size lib60870-C's LinkLayerParameters and
+     * CS101_AppLayerParameters take (addressLength 0..2, sizeOfCOT 1..2,
+     * sizeOfCA 1..2, sizeOfIOA 1..3). */
+    static const int linkSizes[] = { 0, 1, 2 }, twoSizes[] = { 1, 2 }, ioaSizes[] = { 1, 2, 3 };
+    cJSON_AddItemToObject(c, "linkAddressSizes", cJSON_CreateIntArray(linkSizes, 3));
+    cJSON_AddItemToObject(c, "cotSizes", cJSON_CreateIntArray(twoSizes, 2));
+    cJSON_AddItemToObject(c, "caSizes", cJSON_CreateIntArray(twoSizes, 2));
+    cJSON_AddItemToObject(c, "ioaSizes", cJSON_CreateIntArray(ioaSizes, 3));
     cJSON* up = cJSON_AddObjectToObject(c, "upstream");
     cJSON_AddStringToObject(up, "name", "lib60870-C");
     cJSON_AddStringToObject(up, "version", UPSTREAM_VERSION);
@@ -61,7 +69,7 @@ int printCapabilities(void)
     static const char* on[] = { "generalInterrogation", "groupInterrogation", "counterInterrogation", "read",
         "clockSync", "testCommand", "directCommands", "selectBeforeOperate", "commandDeactivation",
         "spontaneousOnCommand", "pointQualityOnBitstring", "unbalancedMode", "balancedMode",
-        "distinctBalancedAddresses" };
+        "distinctBalancedAddresses", "unbalancedCommonAddress" };
     static const char* off[] = { "timeTaggedCommands", "apciParameters", "multipleConnections", "dataTransferEvents",
         "tls", "tlsServer", "tlsClient", "fileTransfer", "fileServer", "fileClient", "fileUploadServer",
         "fileUploadClient", "fileDirectoryServer", "fileDirectoryClient", "redundancyServer", "redundancyClient",

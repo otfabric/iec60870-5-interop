@@ -50,6 +50,7 @@ One JSON object on one line ([schema](../schemas/capabilities.schema.json)):
 | `clientOperations` | Operations of `client` |
 | `asduTypes` | IEC 102 and 103: the type identifications the image decodes (`monitor`) and sends (`control`) |
 | `linkAddressSizes`, `caSizes`, `profiles` | IEC 102: the link address and common address sizes and the profiles (`standard`, `ree`) the image supports ([contract](CONTAINER_CONTRACT.md#iec-102-capabilities)) |
+| `linkAddressSizes`, `cotSizes`, `caSizes`, `ioaSizes` | IEC 101 (contract 2.3): the field sizes the image takes; another is a usage error ([contract](CONTAINER_CONTRACT.md#field-sizes)) |
 
 ## Features of the IEC 104 images
 
@@ -171,17 +172,35 @@ means "not tested", never "tested and failing".
 
 ## Features of the IEC 101 images
 
-| Feature | Meaning | lib60870 | cbsigma |
-|---------|---------|:--------:|:-------:|
-| `unbalancedMode` | Unbalanced transmission: the client polls (class 2, class 1 on ACD) | yes | yes |
-| `balancedMode` | Balanced transmission: both stations are primaries | yes | yes |
-| `distinctBalancedAddresses` | Balanced, `--remote-link-address` other than `--link-address` | yes | no (cB-Sigma uses the controlled station's address in both directions; another value is a usage error) |
-| `generalInterrogation`, `groupInterrogation`, `counterInterrogation`, `read`, `clockSync` | As for IEC 104 | yes | yes |
-| `testCommand` | Test command C_TS_NA_1 (IEC 101 has no C_TS_TA_1) | yes | yes |
-| `directCommands`, `selectBeforeOperate`, `commandDeactivation`, `spontaneousOnCommand` | As for IEC 104 | yes | yes |
-| `pointQualityOnBitstring` | As for IEC 104 (the baseline fixture has no flag on M_BO_NA_1; not exercised for IEC 101 yet) | yes | yes |
-| `timeTaggedCommands` | IEC 101 has no CP56Time2a command types | no | no |
-| `apciParameters`, `multipleConnections`, `dataTransferEvents`, `tls`, `tlsServer`, `tlsClient`, `file*`, `redundancy*`, `secureAuthentication` | IEC 104 only | no | no |
+| Feature | Meaning | lib60870 | cbsigma | digitalpetri |
+|---------|---------|:--------:|:-------:|:------------:|
+| `unbalancedMode` | Unbalanced transmission: the client polls (class 2, class 1 on ACD) | yes | yes | yes |
+| `balancedMode` | Balanced transmission: both stations are primaries | yes | yes | yes |
+| `distinctBalancedAddresses` | Balanced, `--remote-link-address` other than `--link-address` | yes | no (cB-Sigma uses the controlled station's address in both directions; another value is a usage error) | no (digitalpetri puts the station's own address in every frame it sends and ignores the address of what it receives; another value is a usage error) |
+| `unbalancedCommonAddress` | Contract 2.3. Unbalanced client: a request may carry a common address other than `--link-address` | yes | yes | no (its master sends an ASDU to the station whose link address equals the common address, and one with the broadcast common address as SEND/NO REPLY to all stations; such a request is a usage error) |
+| `generalInterrogation`, `groupInterrogation`, `counterInterrogation`, `read`, `clockSync` | As for IEC 104 | yes | yes | yes |
+| `testCommand` | Test command C_TS_NA_1 (IEC 101 has no C_TS_TA_1) | yes | yes | yes |
+| `directCommands`, `selectBeforeOperate`, `commandDeactivation`, `spontaneousOnCommand` | As for IEC 104 | yes | yes | yes |
+| `pointQualityOnBitstring` | As for IEC 104 (the baseline fixture has no flag on M_BO_NA_1; not exercised for IEC 101 yet) | yes | yes | yes |
+| `timeTaggedCommands` | IEC 101 has no CP56Time2a command types | no | no | no |
+| `apciParameters`, `multipleConnections`, `dataTransferEvents`, `tls`, `tlsServer`, `tlsClient`, `file*`, `redundancy*`, `secureAuthentication` | IEC 104 only | no | no | no |
+
+Field sizes (contract 2.3), the same for all three images, each read from
+the library's source: `linkAddressSizes` `[0, 1, 2]` (0 in balanced mode
+only), `cotSizes` `[1, 2]`, `caSizes` `[1, 2]`, `ioaSizes` `[1, 2, 3]`.
+lib60870-C: `LinkLayerParameters.addressLength` and
+`CS101_AppLayerParameters` `sizeOfCOT`, `sizeOfCA`, `sizeOfIOA`; cB-Sigma:
+`cs101` `AddrSize` and `iec.Params`; digitalpetri: `LinkSettings.linkAddressLength`
+and `ProtocolProfile`. The cross-stack run exercises 2/2/2/3, 1/2/1/3,
+2/1/2/2 and 0/1/1/2 (balanced) in the order link address, cause, common
+address, object address; a one-octet object address needs another fixture.
+
+The digitalpetri station answers every request of the fixture in the
+library's raw-ASDU hook (`ServerHandler.onRawAsdu`): the library's own
+station model sends one object per interrogation ASDU, reports with cause 11
+only and refuses a deactivation with cause 45, none of which is the fixture's
+behaviour (FIXTURES.md). The FT 1.2 link, the ASDU codec and the TCP transport
+are the library's.
 
 `pointTypes`: M_SP_NA_1, M_DP_NA_1, M_ST_NA_1, M_BO_NA_1, M_ME_NA_1,
 M_ME_NB_1, M_ME_NC_1, M_IT_NA_1. `commandTypes`: C_SC_NA_1, C_DC_NA_1,

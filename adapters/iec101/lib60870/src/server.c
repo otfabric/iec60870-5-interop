@@ -449,6 +449,10 @@ int runServer(Args* args)
     cJSON_AddStringToObject(ready, "standard", STANDARD);
     cJSON_AddStringToObject(ready, "mode", lnk.balanced ? "balanced" : "unbalanced");
     cJSON_AddNumberToObject(ready, "linkAddress", lnk.address);
+    cJSON_AddNumberToObject(ready, "linkAddressSize", lnk.addrSize);
+    cJSON_AddNumberToObject(ready, "cotSize", lnk.cotSize);
+    cJSON_AddNumberToObject(ready, "caSize", lnk.caSize);
+    cJSON_AddNumberToObject(ready, "ioaSize", lnk.ioaSize);
     emitJson(ready);
 
     /*

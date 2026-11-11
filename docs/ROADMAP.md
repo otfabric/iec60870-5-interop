@@ -5,14 +5,13 @@ assessed in [REFERENCE_STACKS.md](REFERENCE_STACKS.md). Nothing here is done.
 
 ## IEC 60870-5-101
 
-1. **digitalpetri/iec60870** (Java 17, EPL-2.0, native 101-over-TCP) as a third
-   adapter, pinned by full SHA. cB-Sigma's IEC 101 link was debugged against
-   lib60870-C, so the two validated adapters are not fully independent
-   evidence; digitalpetri is the strongest independent peer of the survey.
-2. More cases: interrogation groups (an IEC 101 `extended` fixture), field
-   sizes other than the defaults in the cross-stack run (today only the smoke
-   test exercises 2/2/2/3 per adapter), `--link-address-size 0` in balanced
-   mode, distinct balanced addresses between stacks that support them.
+1. Done in 0.4.0: digitalpetri/iec60870 as the third adapter, and the
+   field sizes in the cross-stack run (contract 2.3: 2/2/2/3, 1/2/1/3,
+   2/1/2/2 and, balanced, no link address field).
+2. More cases: interrogation groups (an IEC 101 `extended` fixture), a
+   one-octet information object address (needs a fixture whose addresses fit
+   it), distinct balanced addresses between stacks that support them
+   (lib60870 only so far).
 3. Captures: a `tshark -d tcp.port==2401,iec60870_101` decode of each pairing
    as a passive check of the frames.
 

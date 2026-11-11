@@ -18,6 +18,29 @@ section per version, newest first, each ending with a `---` line.
 
 ---
 
+## v0.4.0
+
+**Date:** not released (prepared 2026-11-11)
+**Previous release:** v0.3.0
+
+### Added
+
+- Image `iec101-digitalpetri`: digitalpetri/iec60870 at commit `33e52b36` (no release, 0.1.0-SNAPSHOT; EPL-2.0, Java), the third IEC 101 reference and the first not debugged against lib60870-C. The library's own TcpIec101Client and TcpIec101Server (its FT 1.2 link over Netty, no bridge), built from the pinned commit in a multi-stage Dockerfile; unbalanced and balanced, client and server, every field size. The station answers the fixture in the library's raw-ASDU hook. Status validated.
+- Container contract 2.3 (docs/CONTAINER_CONTRACT.md, "Field sizes"): IEC 101 capability documents list the field sizes the image takes (`linkAddressSizes`, `cotSizes`, `caSizes`, `ioaSizes`; another is a usage error), the server's `ready` event reports them (`linkAddressSize`, `cotSize`, `caSize`, `ioaSize`), and the feature `unbalancedCommonAddress` says whether an unbalanced client sends a request with a common address other than its link address. lib60870 and cbsigma take every size and have the feature; digitalpetri takes every size and has not.
+- 33 IEC 101 cases with field sizes other than the defaults, `case.fields-<sizes>.*` in `tests/iec101/cases.tsv`: 2/2/2/3, 1/2/1/3 and 2/1/2/2 (link address, cause, common address, object address) in both link modes and 0/1/1/2 (no link address field) in balanced mode, including the broadcast common address 65535, 255 as an ordinary address, a link address of 300 and an object address of 70000. `scripts/interop.sh` gives a case's link flags to its server as well and skips a pairing that does not declare a size (or `unbalancedCommonAddress` where needed) as unsupported.
+- `tests/iec101/known-bugs.tsv`: an entry may name a role (`<adapter>@server`) and, for the serial standards, match the link mode (the regex sees the operation followed by ` --link-mode <mode>`). First entry: a balanced digitalpetri station sends user data without initializing its own primary direction (docs/COMPATIBILITY.md).
+- The smoke test of an IEC 101 image checks the size lists, a size the image does not list (usage error), and the sizes in the `ready` event.
+
+### Changed
+
+- `adapters/iec101/digitalpetri/` is EPL-2.0, the library's licence, not GPL-3.0-or-later like the other adapters: digitalpetri/iec60870 has no Secondary License notice, so it cannot be combined with GPL code (AGENTS.md rule 6, THIRD_PARTY_NOTICES.md). `licenses/EPL-2.0.txt` added.
+
+### Verified
+
+See docs/COMPATIBILITY.md (IEC 60870-5-101). Locally on linux/arm64 (Docker on macOS), 2026-11-11. Nothing ran on amd64 or in CI.
+
+---
+
 ## v0.3.0
 
 **Date:** 2026-11-11

@@ -11,8 +11,8 @@
 #         validated    smoke and the cross-stack run passed locally, results in
 #                      docs/COMPATIBILITY.md (and reports/ when kept)
 
-interop_version: "0.3.0"
-contract_version: "2.2"        # docs/CONTAINER_CONTRACT.md
+interop_version: "0.4.0"
+contract_version: "2.3"        # docs/CONTAINER_CONTRACT.md
 fixture_schema: "1.0"          # fixtures/schema/iec60870-5-fixture.schema.json, iec60870-5-102-fixture.schema.json, iec60870-5-103-fixture.schema.json
 
 standards:
@@ -67,20 +67,31 @@ implementations:
     note: >-
       Package cs101 on the TCP connection (io.ReadWriteCloser). Its IEC 101
       link was debugged against lib60870-C, so the pair is not two fully
-      independent oracles; a third peer (digitalpetri) is planned. Balanced
+      independent oracles; digitalpetri is the third peer. Balanced
       mode uses one link address in both directions: --remote-link-address
       must equal --link-address.
 
   iec101-digitalpetri:
     standard: iec101
-    status: proposed
+    status: validated
     upstream: "digitalpetri/iec60870"
     repository: "https://github.com/digitalpetri/iec60870"
-    revision: "33e52b3"          # survey clone; full SHA to be pinned with the adapter
+    version: "33e52b3"           # no release (0.1.0-SNAPSHOT); head of main on 2026-11-11
+    revision: "33e52b360c0fa9bc6099eb0b0aa19eed1eff9ad0"
     license: "EPL-2.0"
     language: "Java"
     independent_engine: true
-    note: "Native 101-over-TCP. No adapter yet (docs/ROADMAP.md)."
+    roles: [server, client]
+    link_modes: [unbalanced, balanced]
+    note: >-
+      TcpIec101Client and TcpIec101Server: the library's own FT 1.2 link over
+      Netty, no bridge. Built from the pinned commit (not on Maven Central);
+      Netty 4.1.140.Final, SLF4J 2.0.20, JSpecify 1.0.1 and jOOU 0.9.6 are the
+      versions its pom pins at that commit. EPL-2.0 without a Secondary License
+      notice: the adapter and its image are EPL-2.0. Its unbalanced master
+      sends an ASDU to the station whose link address equals the common
+      address (unbalancedCommonAddress false); balanced mode uses one link
+      address in both directions.
 
   # ---- IEC 60870-5-102 (contract 2.2) ----
   # No open controlled station (meter) exists, so there is no cross-stack
@@ -275,7 +286,8 @@ dependencies:
   nuget_system_io_ports: "8.0.0"   # iec103 vitusdong and ariec103, MIT; packages.lock.json pins the content hash
   nuget_system_text_encoding_codepages: "8.0.0"   # iec103 vitusdong, MIT
   go_bug_st_serial: "v1.6.4"   # iec103 goiecp5 (through cs101), BSD-3-Clause
-  gson: "2.14.0"               # iec104 openmuc adapter, Apache-2.0
+  gson: "2.14.0"               # iec104 openmuc and iec101 digitalpetri adapters, Apache-2.0
+  slf4j_simple: "2.0.20"       # iec101 digitalpetri adapter (the SLF4J version digitalpetri pins), MIT
   cjson: "debian trixie libcjson1"     # lib60870 adapters, MIT
   mbedtls: "3.6.7"             # lib60870 adapters, Apache-2.0 OR GPL-2.0-or-later
   mbedtls_sha256: "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6"
@@ -295,6 +307,7 @@ base_images:
 images:
   iec101-lib60870: "ghcr.io/otfabric/iec60870-5-interop-iec101-lib60870"
   iec101-cbsigma: "ghcr.io/otfabric/iec60870-5-interop-iec101-cbsigma"
+  iec101-digitalpetri: "ghcr.io/otfabric/iec60870-5-interop-iec101-digitalpetri"
   iec102-gisce: "ghcr.io/otfabric/iec60870-5-interop-iec102-gisce"
   iec103-vitusdong: "ghcr.io/otfabric/iec60870-5-interop-iec103-vitusdong"
   iec103-goiecp5: "ghcr.io/otfabric/iec60870-5-interop-iec103-goiecp5"    # not published (licence)

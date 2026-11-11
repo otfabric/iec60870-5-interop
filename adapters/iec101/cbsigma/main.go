@@ -92,6 +92,11 @@ func printCapabilities() int {
 		"standard":       standard,
 		"transport":      "tcp-stream",
 		"linkModes":      []string{"unbalanced", "balanced"},
+		// Contract 2.3: every field size iec.Params and cs101 take.
+		"linkAddressSizes": []int{0, 1, 2},
+		"cotSizes":         []int{1, 2},
+		"caSizes":          []int{1, 2},
+		"ioaSizes":         []int{1, 2, 3},
 		"upstream": object{
 			"name":     "cB-Sigma/iec60870",
 			"version":  upstreamVersion,
@@ -136,6 +141,7 @@ func printCapabilities() int {
 			"unbalancedMode":            true,
 			"balancedMode":              true,
 			"distinctBalancedAddresses": false,
+			"unbalancedCommonAddress":   true,
 		},
 		"pointTypes": []string{"M_SP_NA_1", "M_DP_NA_1", "M_ST_NA_1", "M_BO_NA_1", "M_ME_NA_1", "M_ME_NB_1",
 			"M_ME_NC_1", "M_IT_NA_1"},
