@@ -98,15 +98,19 @@ SKIPPED=0
 skip() { SKIPPED=$((SKIPPED + 1)); result unsupported "$*"; [[ -n "${VERBOSE:-}" ]] && log "skip: $*"; return 0; }
 
 # known_bug <client> <server> <operation>: prints the description of a known
-# bug that may affect this pairing and operation, if there is one.
+# bug that may affect this pairing and operation, if there is one. The
+# client's entries come first: its request is the first frame of the
+# exchange, so its deviation is the first one the operation meets.
 known_bug() {
-    local bug_adapter bug_regex bug_text bug_id
-    while IFS=$'\t' read -r bug_adapter bug_regex bug_text bug_id _; do
-        if [[ "${bug_adapter}" == "$1" || "${bug_adapter}" == "$2" ]] && [[ "$3" =~ ${bug_regex} ]]; then
-            printf '%s\t%s\n' "${bug_id}" "${bug_text}"
-            return 0
-        fi
-    done < "${WORK}/active"
+    local bug_adapter bug_regex bug_text bug_id who
+    for who in "$1" "$2"; do
+        while IFS=$'\t' read -r bug_adapter bug_regex bug_text bug_id _; do
+            if [[ "${bug_adapter}" == "${who}" ]] && [[ "$3" =~ ${bug_regex} ]]; then
+                printf '%s\t%s\n' "${bug_id}" "${bug_text}"
+                return 0
+            fi
+        done < "${WORK}/active"
+    done
     return 1
 }
 

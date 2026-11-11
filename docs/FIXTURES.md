@@ -395,7 +395,7 @@ exits 4 on a violation.
 | `station.identification` | ASDU 5: `fun` the device's function type, `col` the compatibility level, `ascii` exactly eight printable characters, `software` four octets in hex |
 | `indications[]` | `fun` 0..254 and `inf`, unique together; `dpi` 0..3 (1 off, 2 on); `gi` false keeps it out of the general interrogation (default true) |
 | `measurands[]` | `fun`, `inf` (unique with the indications), `type` 3 (measurands I, at most four values) or 9 (measurands II, at most nine), `values[]`: `value` -4096..4095 (the 13-bit value), `ov`, `er` (default false) |
-| `commands[]` | `fun`, `inf`: a general command the device takes, acting on the indication with the same function type and information number, which must exist |
+| `commands[]` | `fun`, `inf`: a general command the device takes, acting on the indication with the same function type and information number, which must exist. For a function type of a compatible range, INF 19 and 23..26 take ON only (table 17, COM) |
 
 ### Station behaviour (IEC 103)
 
@@ -414,27 +414,40 @@ with every connection.
 | ASDU 7 (general interrogation, FUN 255, INF 0) | ACK; queues ASDU 1, cause 9, SIN the scan number, for every indication with `gi` not false, in the fixture's order, then ASDU 8, cause 10, the same scan number |
 | ASDU 6 (clock synchronization), addressed | ACK; sets the station's clock; queues ASDU 6, cause 8, FUN 255, INF 0 with the new time |
 | ASDU 6 to link address 255 (SEND/NO REPLY) | Sets the clock; no answer |
-| ASDU 20 (general command) | ACK. A command of the fixture with DCO 1 or 2: the indication's DPI becomes the DCO, and the station queues ASDU 1, cause 20 (positive acknowledgement), the command's FUN and INF, the new DPI, SIN the RII. Anything else (a FUN/INF that is no command of the fixture, DCO 0 or 3): nothing changes, ASDU 1, cause 21 (negative acknowledgement), the DPI of the indication (0 when there is none), SIN the RII |
+| ASDU 20 (general command) | ACK. A command of the fixture with DCO 1 (OFF) or 2 (ON) that the COM column of table 17 allows (for a function type of a compatible range, INF 19 and 23..26 take ON only; clause 7.2.6.4): the indication's DPI becomes the DCO, and the station queues ASDU 1, cause 20 (positive acknowledgement), the command's FUN and INF, SIN the RII; then, when the DPI changed, ASDU 1, cause 12 (remote operation), the FUN and INF, the new DPI, SIN 0 (clause 7.4.4, figure 7). Anything else (a FUN/INF that is no command of the fixture, DCO 0 or 3, OFF where table 17 allows only ON, a command before the previous one was acknowledged): nothing changes, ASDU 1, cause 21 (negative acknowledgement), the command's FUN and INF, SIN the RII, and no cause 12 report |
+
+The DPI of an acknowledgement (cause 20 or 21) is not significant (the notes
+to clauses 7.3.1.1 and 7.3.1.2), and SIN only with causes 9, 20 and 21
+(clause 7.2.6.23): checks compare neither the DPI of an acknowledgement nor
+the SIN of a cause 12 report. The order is that of clause 7.4.4 and figure 7:
+the acknowledgement ends the command procedure, the change of state follows,
+so a client that collects after the acknowledgement (`--collect-ms`) receives
+cause 20, then cause 12.
 
 Time tags (CP32Time2a of ASDU 1) are the station's clock. Nothing else is
-sent: no spontaneous ASDUs, no cause 12 report after a command.
+sent: no spontaneous ASDUs (cause 1).
 
 ### The IEC 103 baseline fixture
 
 `fixtures/iec103/baseline`: an overcurrent protection device (function type
 160) identified as `OTFAB103`, COL 2, software `01020304`.
 
-| Indication | DPI | In the interrogation | Command |
-|------------|-----|----------------------|---------|
-| 160/16 auto-recloser active | 2 (on) | yes | yes |
-| 160/17 teleprotection active | 1 (off) | yes | yes |
-| 160/18 protection active | 2 | yes | yes |
-| 160/19 LED reset | 1 | yes | yes |
-| 160/23 characteristic 1 | 2 | yes | yes |
-| 160/24 characteristic 2 | 1 | yes | yes |
+| Indication | DPI | In the interrogation | Command (table 17, COM) |
+|------------|-----|----------------------|-------------------------|
+| 160/16 auto-recloser active | 2 (on) | yes | yes (ON/OFF) |
+| 160/17 teleprotection active | 1 (off) | yes | yes (ON/OFF) |
+| 160/18 protection active | 2 | yes | no: refused with cause 21 (a valid pair of table 17 the device does not take) |
+| 160/19 LED reset | 1 | yes | yes (ON only) |
+| 160/23 characteristic 1 | 2 | yes | no |
+| 160/24 characteristic 2 | 1 | yes | no |
 | 160/27 auxiliary input 1 | 1 | yes | no |
 | 160/36 trip circuit supervision | 1 | yes | no |
 | 160/68 general trip | 1 | no | no |
+
+The commands are pairs a client that follows table 17 sends to an
+overcurrent protection (FUN 160): INF 16..19 list FUN 160 as typical; INF
+23..26 list only distance protection (FUN 128), and INF 32..239 are not used
+in the control direction (clause 7.2.5.2).
 
 Measurands, class 2: 160/144 (ASDU 3, one value 2048), 160/145 (ASDU 3, 1024
 and -512 with OV), 160/148 (ASDU 9, nine values: 100, 200, 300, 3000, 3001,

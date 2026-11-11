@@ -54,17 +54,23 @@ for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
 done
 
 # ---- values: a general command changes what an interrogation reports ----
+# Clause 7.4.4: the acknowledgement (cause 20, SIN the RII; its DPI is not
+# significant) and then the change of state (cause 12, the new DPI; its SIN
+# is not significant), and a later interrogation reports the new state.
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
         if ! supported "${client}" "${server}" "server:generalCommand,client:generalCommand"; then
             at_pair values.command-interrogation "${client}" "${server}"; skip "${client}->${server}: command"; continue
         fi
         name=$(start_server "${server}"); wait_ready "${name}" || exit 1
-        doc=$(run_client "${client}" command --fun 160 --inf 17 --dco on --rii 9 --host "${name}")
+        doc=$(run_client "${client}" command --fun 160 --inf 17 --dco on --rii 9 --collect-ms 500 --host "${name}")
         keep "iec103-values-command-${client}->${server}" "${doc}"
         value_check values.command-confirmation "${client}" "${server}" "command --fun 160 --inf 17" \
-            "$(jq -c '[.asdus[] | select((.typeId == 1 or .typeId == 2) and (.cot == 20 or .cot == 21)) | .objects[0] | {cot: 20, fun, inf, dpi, sin}]' <<<"${doc}" 2>/dev/null)" \
-            '[{"cot":20,"fun":160,"inf":17,"dpi":2,"sin":9}]' "the command is confirmed with the new state and the RII"
+            "$(jq -c '[.asdus[] | select((.typeId == 1 or .typeId == 2) and (.cot == 20 or .cot == 21)) | {cot} + (.objects[0] | {fun, inf, sin})]' <<<"${doc}" 2>/dev/null)" \
+            '[{"cot":20,"fun":160,"inf":17,"sin":9}]' "the command is acknowledged with cause 20 and the RII"
+        value_check values.command-report "${client}" "${server}" "command --fun 160 --inf 17" \
+            "$(jq -c '[.asdus[] | select((.typeId == 1 or .typeId == 2) and .cot == 12) | .objects[0] | {fun, inf, dpi}]' <<<"${doc}" 2>/dev/null)" \
+            '[{"fun":160,"inf":17,"dpi":2}]' "the change of state follows with cause 12 and the new state"
         after=$(run_client "${client}" interrogate --host "${name}" \
             | jq -c '[.asdus[] | select(.cot == 9) | .objects[0] | select(.fun == 160 and .inf == 17) | .dpi]' 2>/dev/null)
         value_check values.command-interrogation "${client}" "${server}" "command --fun 160 --inf 17" \

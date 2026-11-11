@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "name": "baseline",
-  "description": "One IEC 103 protection device (overcurrent protection, function type 160): its identification, status indications of the compatible range answered by a general interrogation, measurands I and II sent as cyclic class 2 data, and general commands that set the indication with the same function type and information number.",
+  "description": "One IEC 103 protection device (overcurrent protection, function type 160): its identification, status indications of the compatible range answered by a general interrogation, measurands I and II sent as cyclic class 2 data, and general commands of table 17 that set the indication with the same function type and information number (160/18 is an indication but no command of the device).",
   "station": {
     "commonAddress": 1,
     "identification": { "fun": 160, "col": 2, "ascii": "OTFAB103", "software": "01020304" }
@@ -29,9 +29,6 @@
   "commands": [
     { "fun": 160, "inf": 16 },
     { "fun": 160, "inf": 17 },
-    { "fun": 160, "inf": 18 },
-    { "fun": 160, "inf": 19 },
-    { "fun": 160, "inf": 23 },
-    { "fun": 160, "inf": 24 }
+    { "fun": 160, "inf": 19 }
   ]
 }

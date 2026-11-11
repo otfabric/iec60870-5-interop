@@ -18,4 +18,6 @@
 # may fail and is counted as "known bug" rather than as a failure. If no
 # matching case fails any more, the run fails: the entry is stale and must be
 # removed.
+# When entries of both adapters of a pairing match an operation, the client's
+# is the one counted: its request is the first frame of the exchange.
 openmuc	1.8.0	^read( |$)	j60870 1.8.0 cannot decode C_RD_NA_1 and closes the connection when it receives one	openmuc-read-command	https://github.com/gythialy/j60870/pull/75

@@ -91,7 +91,7 @@ None found for IEC 101 (`tests/iec101/known-bugs.tsv` is empty).
 
 Run locally on 2026-11-11 (linux/arm64, `:dev` images of this commit), with
 `REPORT_DIR` set; `results.json` of the IEC 103 runs: 182 pass, 0 fail,
-4 unsupported, 41 known-difference, 0 infra-error. The 4 capability
+4 unsupported, 45 known-difference, 0 infra-error. The 4 capability
 documents and 48 client result documents kept validate against `schemas/`
 (0 errors).
 
@@ -101,13 +101,14 @@ documents and 48 client result documents kept validate against `schemas/`
 | smoke goiecp5 (client, against vitusdong's server) | `scripts/smoke.sh iec103 goiecp5` | 34 | 0 | 0 |
 | smoke ariec103 (client, against vitusdong's server) | `scripts/smoke.sh iec103 ariec103` | 34 | 0 | 0 |
 | smoke open103 (client, against vitusdong's server) | `scripts/smoke.sh iec103 open103` | 34 | 0 | 0 |
-| cross-stack, unbalanced | `scripts/interop.sh iec103 vitusdong goiecp5 ariec103 open103` | 27 | 0 | 41 known bugs, 4 unsupported |
+| cross-stack, unbalanced | `scripts/interop.sh iec103 vitusdong goiecp5 ariec103 open103` | 27 | 0 | 45 known bugs, 4 unsupported |
 
 The cross-stack run pairs every client (vitusdong, goiecp5, ariec103,
 open103) with the one server (vitusdong): the 9 cases of
 `tests/iec103/cases.tsv` (36 outcome checks and the agreement of the
 pairings), then the values (interrogation, identification, command
-confirmation and the command seen by the next interrogation, measurands) and
+acknowledgement, its change of state with cause 12 and the command seen by
+the next interrogation, measurands) and
 2 session checks per pairing. What passed: the link start-up of all four
 clients (reset of the communication unit, ArIEC103 adding a reset of the FCB,
 Open103 a status of link), `connect` and `monitor` with identical documents
@@ -116,15 +117,21 @@ from all four, the clock synchronization of goiecp5, vitusdong and open103
 the interrogation on the next connection (8 session checks), and the
 termination of the interrogation with the requested scan number for every
 client. The 4 unsupported are the measurands: vitusdong's server is given
-none (CAPABILITIES.md). The 41 known differences are the four entries of
-`tests/iec103/known-bugs.tsv`; each reproduced in this run:
+none (CAPABILITIES.md). The 45 known differences are the six entries of
+`tests/iec103/known-bugs.tsv`; each reproduced in this run. When entries of
+both adapters match, the client's is counted (its request is the first
+frame), so the command checks of ariec103 and open103 against vitusdong count
+as their own bugs (7 each) and those of goiecp5 and vitusdong as vitusdong's
+(14):
 
 | Known bug | Cases it explains | Wire evidence (this run) |
 |-----------|-------------------|--------------------------|
 | vitusdong v0.1.0: interrogation replies with cause 11 and a 12-octet ASDU 1 | `interrogate` (2 cases × 4 clients), values.interrogation (4) | `68 14 14 68 28 01 01 81 0B 01 A0 10 02 FF FF FF FF 24 66 02 02 0B 0B 1A 23 16`: ASDU 1, cause 11, FUN 160 INF 16, DPI 2, `FF FF FF FF`, CP56Time2a; the standard's is DPI, CP32Time2a, SIN with cause 9 |
-| vitusdong v0.1.0: command confirmed with ASDU 1 cause 11 / 139 | 4 command cases × 4 clients, values.command-* (8) | positive: `... 01 81 0B 01 A0 10 01 FF FF FF FF ...` (cause 11); refusal of 160/99: `... 01 81 8B 01 A0 63 00 FF FF FF FF ...` (cause 0x8B); never cause 20 or 21 with the RII. Open103 sends no command at all to a station that identified with FUN 255 (error `failed`) |
+| vitusdong v0.1.0: command confirmed with ASDU 1 cause 11 / 139, no cause 12 report | 4 command cases × 2 clients (goiecp5, vitusdong), values.command-* (3 × 2) | positive: `... 01 81 0B 01 A0 10 01 FF FF FF FF ...` (cause 11, which its `Cot103` calls remote operation; IEC 103 has 11 local and 12 remote operation); DCO 3: cause 0x8B (11 with the P/N bit); 160/18, an indication the fixture gives no command, is executed; never cause 20 or 21 with the RII, never cause 12 |
 | vitusdong v0.1.0: identification without COL and software id | values.identification (4) | `68 10 10 68 28 01 05 81 04 01 FF 50 4F 54 46 41 42 31 30 33 03 16`: ASDU 5, cause 4, FUN 255, INF 80, then `OTFAB103` only; a second one with INF 81, cause 5 |
 | ariec103 v1.2.31-3-gec08dd7: clock synchronization with a CP32Time2a | `clock-sync` (ariec103 → vitusdong) | `68 0D 0D 68 53 01 06 81 08 01 FF 00 39 30 23 0F 00 7E 16`: five octets after FUN/INF (ms, minute, hour, 0); Iec103Server needs seven and sends no confirmation |
+| ariec103 v1.2.31-3-gec08dd7: general command without the RII | 4 command cases, values.command-* (3) (ariec103 → vitusdong) | `68 09 09 68 53 01 14 81 14 01 A0 10 02 B0 16`: FUN 160, INF 16, DCO 2 and no RII (clause 7.3.2.4); go-iec60870-5's consumer suite saw `14 81 14 01 A0 63 02` and its server, which checks the length, sends no acknowledgement; Iec103Server takes the short ASDU |
+| open103 887ff5a5: a command only for the typical INF of the identified function type | 4 command cases, values.command-* (3) (open103 → vitusdong) | nothing sent (error `failed`): vitusdong identifies with FUN 255, for which `CommandTrasmission` allows no INF; against a station of FUN 160 (go-iec60870-5's consumer suite) it sent 16..19 and nothing for 160/23, whose FUN column in table 17 is typical, not mandatory |
 
 ### Not shown by these runs
 
@@ -150,8 +157,6 @@ server, which accepts them; a strict station would not:
 
 - vitusdong's client sends ASDU 6 with FUN 0 (the standard: 255):
   `68 0F 0F 68 53 01 06 81 08 01 00 00 39 30 23 0F 09 0A 1A AC 16`.
-- ArIEC103 sends ASDU 20 without the return information identifier
-  (`68 09 09 68 53 01 14 81 14 01 A0 10 02 B0 16`: FUN 160, INF 16, DCO 2, no RII).
 - The ArIEC103 slave simulator (not an image; run over TCP for the survey)
   answers a request of the status of link with ACK, ends every interrogation
   with SCN 0, sends measurands as ASDU 9 with one value and a stray octet, and

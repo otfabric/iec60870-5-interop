@@ -220,15 +220,19 @@ says what the library knows.
 1. ArIEC103 sends ASDU 6 with a CP32Time2a and one zero octet instead of a
    CP56Time2a (`tests/iec103/known-bugs.tsv`).
 2. Open103's `TimeSync` takes a `time_t`: the milliseconds of `--time` are lost.
-3. Iec103Server confirms with ASDU 1 cause 11 (known bug); it executes a
-   command for any indication of the station, not only the fixture's
-   `commands` (it has no notion of a command list), so a command for an
-   indication without one is not refused.
+3. Iec103Server confirms with ASDU 1 cause 11 (known bug) and sends no
+   change of state with cause 12 after it (clause 7.4.4): its `Cot103` has
+   remote operation as 11, and the session queue that would take another
+   ASDU is private, so the adapter cannot add the report the fixture
+   specifies. It executes a command for any indication of the station, not
+   only the fixture's `commands` (it has no notion of a command list), so
+   160/18, an indication without a command, is not refused.
 4. ArIEC103's general command has no return information identifier: `--rii`
-   is accepted and not sent.
+   is accepted and not sent (known bug `ariec103-command-no-rii`).
 5. Open103 sends a command only when its INF fits the function type of the
-   station's identification (16..19 for 160, with a fall-through in its
-   switch); otherwise the result is the error `failed`.
+   station's identification (16..19 for 160, any for 128, none for 255, with
+   a fall-through in its switch); otherwise the result is the error `failed`
+   (known bug `open103-command-typical-fun`).
 6. Two ASDU 5 (INF 80 cause 4, INF 81 cause 5) of eight characters, without
    COL and software identification (known bug).
 7. Iec103Server sends one raw 16-bit value per ASDU 9 only, so the adapter
