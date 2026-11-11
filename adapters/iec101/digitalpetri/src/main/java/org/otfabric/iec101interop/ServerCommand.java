@@ -72,6 +72,9 @@ final class ServerCommand implements ServerHandler {
     private final LinkConfig lc;
     private final int ca;
     private final Object lock = new Object();
+    /** How long a command reply waits for the one before it to leave (LinkTap.Sent). */
+    private static final long ORDER_WAIT_MS = 5_000;
+    private final LinkTap.Sent sent = new LinkTap.Sent();
 
     private ServerCommand(Fixture fx, LinkConfig lc) {
         this.fx = fx;
@@ -121,7 +124,7 @@ final class ServerCommand implements ServerHandler {
                         @Override
                         protected void initChannel(io.netty.channel.Channel ch) {
                             ch.pipeline().addLast(library);
-                            ch.pipeline().addFirst("link-tap", new LinkTap(lc.addrSize, () -> { }));
+                            ch.pipeline().addFirst("link-tap", new LinkTap(lc.addrSize, () -> { }, station.sent));
                         }
                     });
                 })
@@ -535,10 +538,18 @@ final class ServerCommand implements ServerHandler {
             case "deactivated" -> ctx.send(reply(a, Cause.DEACTIVATION_CONFIRMATION, false));
             case "rejected" -> ctx.send(reply(a, Cause.ACTIVATION_CONFIRMATION, true));
             default -> {
+                long mark = sent.mark();
                 ctx.send(reply(a, Cause.ACTIVATION_CONFIRMATION, false));
                 if (report != null) {
                     // Confirmation, then the new state of the target, then termination.
+                    // The report is class 1 and the others class 2 in an unbalanced
+                    // link (LinkTap.Sent): each waits until the one before has left.
+                    // Bounded, so a controlling station that stops polling ends it.
+                    int type = a.type().typeId();
+                    sent.await(mark, type, Cause.ACTIVATION_CONFIRMATION.value(), ORDER_WAIT_MS);
+                    mark = sent.mark();
                     ctx.send(report);
+                    sent.await(mark, report.type().typeId(), report.cause().value(), ORDER_WAIT_MS);
                     ctx.send(reply(a, Cause.ACTIVATION_TERMINATION, false));
                 }
             }
