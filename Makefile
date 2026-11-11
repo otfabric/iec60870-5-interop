@@ -15,7 +15,8 @@ PLATFORMS ?= linux/amd64,linux/arm64
 
 # Registry of the base images (debian, maven, eclipse-temurin, golang). They
 # are pinned by digest in the Dockerfiles, so any mirror of Docker Hub's
-# official images gives the same build. CI sets
+# official images gives the same build. The .NET images of the IEC 103
+# adapters come from mcr.microsoft.com, also pinned by digest. CI sets
 #   BASE_REGISTRY=mirror.gcr.io/library
 # because anonymous pulls from Docker Hub are rate limited per runner address.
 BASE_REGISTRY ?= docker.io/library
@@ -33,10 +34,16 @@ BUILDER ?= iec60870-5-interop
 #   make smoke-iec101 IEC101_ADAPTERS=cbsigma
 IEC101_ADAPTERS ?= lib60870 cbsigma
 IEC104_ADAPTERS ?= lib60870 openmuc wendy512 cbsigma part5
+# IEC 103: vitusdong has both roles; the others are clients (control systems).
+IEC103_ADAPTERS ?= vitusdong goiecp5 ariec103 open103
 # IEC 101/102/103 self-tests run once per link mode.
 LINK_MODES ?= unbalanced balanced
 
-IMAGES := $(addprefix iec101-,$(IEC101_ADAPTERS)) $(addprefix iec104-,$(IEC104_ADAPTERS))
+IMAGES := $(addprefix iec101-,$(IEC101_ADAPTERS)) $(addprefix iec103-,$(IEC103_ADAPTERS)) $(addprefix iec104-,$(IEC104_ADAPTERS))
+# Built and tested, not published: the licence of riclolsen/go-iecp5 is not
+# settled (versions.yaml, iec103-goiecp5).
+UNPUBLISHED ?= iec103-goiecp5
+PUBLISHED := $(filter-out $(UNPUBLISHED),$(IMAGES))
 
 image = $(REGISTRY)/iec60870-5-interop-$(1)
 std_of = $(word 1,$(subst -, ,$(1)))
@@ -44,8 +51,8 @@ adapter_of = $(word 2,$(subst -, ,$(1)))
 
 export REGISTRY VERSION
 
-.PHONY: publish-arch publish-manifest digests help all ci validate documents lint images smoke smoke-iec101 smoke-iec104 interop interop-iec101 \
-        interop-iec104 buildx buildx-setup publish capabilities clean FORCE
+.PHONY: publish-arch publish-manifest digests help all ci validate documents lint images smoke smoke-iec101 smoke-iec103 smoke-iec104 \
+        interop interop-iec101 interop-iec103 interop-iec104 buildx buildx-setup publish capabilities clean FORCE
 FORCE:
 
 help: ## Show this help
@@ -105,11 +112,14 @@ image-%: FORCE ## Build one image, e.g. image-iec101-lib60870
 
 # ── Self-tests (images must be built) ─────────────────────────────────────────
 
-smoke: smoke-iec101 smoke-iec104 ## Container-contract smoke test of every image
+smoke: smoke-iec101 smoke-iec103 smoke-iec104 ## Container-contract smoke test of every image
 
 smoke-iec101: ## Smoke test every IEC 101 image in every link mode
 	@for m in $(LINK_MODES); do for a in $(IEC101_ADAPTERS); do \
 		LINK_MODE=$$m scripts/smoke.sh iec101 $$a || exit 1; done; done
+
+smoke-iec103: ## Smoke test every IEC 103 image (unbalanced only; a client-only image runs against vitusdong's server)
+	@for a in $(IEC103_ADAPTERS); do scripts/smoke.sh iec103 $$a || exit 1; done
 
 smoke-iec104: ## Smoke test every IEC 104 image
 	@for a in $(IEC104_ADAPTERS); do scripts/smoke.sh iec104 $$a || exit 1; done
@@ -117,10 +127,13 @@ smoke-iec104: ## Smoke test every IEC 104 image
 smoke-%: FORCE ## Smoke test one image, e.g. smoke-iec104-openmuc (IEC 101: LINK_MODE=balanced)
 	@scripts/smoke.sh $(call std_of,$*) $(call adapter_of,$*)
 
-interop: interop-iec101 interop-iec104 ## Cross-stack self-tests: every client against every server
+interop: interop-iec101 interop-iec103 interop-iec104 ## Cross-stack self-tests: every client against every server
 
 interop-iec101: ## IEC 101 cross-stack self-test, once per link mode
 	@for m in $(LINK_MODES); do LINK_MODE=$$m scripts/interop.sh iec101 $(IEC101_ADAPTERS) || exit 1; done
+
+interop-iec103: ## IEC 103 cross-stack self-test: every client against every server (unbalanced)
+	@scripts/interop.sh iec103 $(IEC103_ADAPTERS)
 
 interop-iec104: ## IEC 104 cross-stack self-test
 	@scripts/interop.sh iec104 $(IEC104_ADAPTERS)
@@ -150,7 +163,7 @@ buildx: ## Build every image for $(PLATFORMS) under emulation, without pushing
 publish: ## Build and push multi-arch images under emulation (requires VERSION=vX.Y.Z; the Release workflow uses publish-arch instead)
 	@if ! echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 		echo "Error: VERSION must be in the form v<major>.<minor>.<patch>"; exit 1; fi
-	@for i in $(IMAGES); do \
+	@for i in $(PUBLISHED); do \
 		std=$${i%%-*}; a=$${i#*-}; \
 		$(RETRY) docker buildx build $(builder_flag) --platform $(PLATFORMS) --push \
 			--build-arg BASE_REGISTRY=$(BASE_REGISTRY) --build-arg ADAPTER_VERSION=$(VERSION) \
@@ -163,7 +176,7 @@ ARCHS ?= amd64 arm64
 publish-arch: ## Push the local images of this machine as <image>:$(VERSION)-$(ARCH) (build and self-test them first)
 	@if ! echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 		echo "Error: VERSION must be in the form v<major>.<minor>.<patch>"; exit 1; fi
-	@for i in $(IMAGES); do \
+	@for i in $(PUBLISHED); do \
 		got=$$(docker image inspect --format '{{.Architecture}}' $(call image,$$i):$(VERSION)) || exit 1; \
 		if [ "$$got" != "$(ARCH)" ]; then echo "Error: $$i:$(VERSION) is $$got, not $(ARCH)"; exit 1; fi; \
 		echo "Pushing $$i $(VERSION) for linux/$(ARCH)..."; \
@@ -172,7 +185,7 @@ publish-arch: ## Push the local images of this machine as <image>:$(VERSION)-$(A
 	done
 
 publish-manifest: ## Join the per-architecture images of VERSION into the multi-arch <image>:$(VERSION)
-	@for i in $(IMAGES); do \
+	@for i in $(PUBLISHED); do \
 		echo "Creating $$i $(VERSION) from: $(ARCHS)"; \
 		$(RETRY) docker buildx imagetools create --tag $(call image,$$i):$(VERSION) \
 			$(foreach arch,$(ARCHS),$(call image,$$i):$(VERSION)-$(arch)) || exit 1; \
@@ -183,7 +196,7 @@ publish-manifest: ## Join the per-architecture images of VERSION into the multi-
 	done
 
 digests: ## Print "<standard>-<adapter> <digest>" of the published multi-arch images of VERSION
-	@for i in $(IMAGES); do \
+	@for i in $(PUBLISHED); do \
 		d=$$($(RETRY) docker buildx imagetools inspect $(call image,$$i):$(VERSION) --format '{{.Manifest.Digest}}') || exit 1; \
 		echo "$$i $$d"; \
 	done

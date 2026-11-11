@@ -1,6 +1,6 @@
 # Container contract
 
-Version: **2.0** (`contract_version` in [versions.yaml](../versions.yaml))
+Version: **2.1** (`contract_version` in [versions.yaml](../versions.yaml))
 
 Every adapter image exposes the same commands, flags, JSON documents and exit
 codes, for each standard of the IEC 60870-5 family it implements. Consumers
@@ -14,6 +14,7 @@ a reader of 1.3 documents reads 2.0 documents unchanged.
 
 | Version | Change |
 |---------|--------|
+| 2.1 | [IEC 103](#iec-103): unbalanced only, a one-octet link address, no information object addresses; the client operations `connect`, `interrogate` (`--scn`), `clock-sync` (`--broadcast`), `command` (`--fun`, `--inf`, `--dco`, `--rii`), `monitor`; ASDU documents of IEC 103 (`fun`, `inf`, `dpi`, `sin`, `time32`, `values`, ...), `asduTypes` and the IEC 103 features in capability documents; confirmations with causes 8, 20 and 21; server events of IEC 103. An image may be a client only (`roles.server` false): `server` is then a usage error |
 | 2.0 | One repository for the IEC 60870-5 family (`iec60870-5-interop`, from `iec104-interop` 0.6.0, contract 1.3). Image `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`; entrypoint `/usr/local/bin/iec60870-5-interop`; readiness file `/run/iec60870-5-interop/ready`. `standard` in capability documents (and `transport`, `linkModes` for the serial standards). [IEC 101, 102 and 103](#iec-101-102-and-103): the FT 1.2 byte stream over one TCP connection, port 2401, the [link flags](#link-flags), the error `link-init-timeout`, results without `startdtConfirmed`; C_TS_NA_1 in ASDU documents (`fbp`). IEC 104 is contract 1.3 under the new names |
 | 1.3 | (iec104-interop) Interrogation groups, `pointQualityOnBitstring`, the fixture `extended`; the transport security flags of IEC 62351-3; `file-put`, `file-dir`, uploads, F_DR_TA_1; redundancy groups |
 | 1.2 | (iec104-interop) The security flags of the A-Profile of IEC 62351-5 |
@@ -31,6 +32,7 @@ What a *station* does with a request is defined by its fixture: see
 
 - [Standards and images](#standards-and-images)
 - [IEC 101, 102 and 103](#iec-101-102-and-103)
+- [IEC 103](#iec-103)
 - [Image layout](#image-layout)
 - [Commands](#commands)
 - [Security flags](#security-flags)
@@ -55,13 +57,14 @@ What a *station* does with a request is defined by its fixture: see
 An image implements one standard with one stack:
 `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`, for example
 `iec60870-5-interop-iec101-lib60870` and `iec60870-5-interop-iec104-lib60870`.
-Images of this version: IEC 101 `lib60870`, `cbsigma`; IEC 104 `lib60870`,
-`openmuc`, `wendy512`, `cbsigma`, `part5`. There are no IEC 102 or 103
-images yet ([ROADMAP.md](ROADMAP.md)); their rows define the names only.
+Images of this version: IEC 101 `lib60870`, `cbsigma`; IEC 103 `vitusdong`
+(server and client), `goiecp5`, `ariec103`, `open103` (clients); IEC 104
+`lib60870`, `openmuc`, `wendy512`, `cbsigma`, `part5`. There are no IEC 102
+images yet ([ROADMAP.md](ROADMAP.md)); its row defines the names only.
 
-Everything after the section on IEC 101, 102 and 103 is written for IEC 104
-(it is contract 1.3) and applies to the serial standards except where that
-section says otherwise.
+Everything after the sections on IEC 101, 102 and 103 is written for IEC 104
+(it is contract 1.3) and applies to the serial standards except where those
+sections say otherwise. For IEC 103, [its own section](#iec-103) comes first.
 
 ## IEC 101, 102 and 103
 
@@ -182,18 +185,154 @@ features (`apciParameters`, `tls*`, `file*`, `redundancy*`,
 `secureAuthentication`, `dataTransferEvents`, `multipleConnections`,
 `timeTaggedCommands`) are present and false. See [CAPABILITIES.md](CAPABILITIES.md).
 
+## IEC 103
+
+IEC 60870-5-103, the companion standard for the informative interface of
+protection equipment. The [transport of IEC 101](#transport) is that of IEC 101: the FT 1.2
+byte stream over one TCP connection, port **2401**, one connection at a time,
+every connection a line that has just come up. The **server is the protection
+equipment** (the secondary station) and the **client the control system** (the
+primary station); there is no other arrangement in IEC 103. What this section
+does not change is as for IEC 101.
+
+An IEC 103 image may be a client only (`roles.server` false): many open IEC 103
+stacks are masters. For such an image `server` is a usage error (exit 2) and
+the image has no health check or default server; `print-fixture` still prints
+the fixtures it bakes in.
+
+### IEC 103 link
+
+Unbalanced transmission only, with a link address of one octet (IEC 60870-5-103
+clause 6.2.3: the address field is one octet; 255 is the broadcast address).
+The common address of the ASDU, also one octet, is normally the link address.
+
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--link-mode M` | `unbalanced` | Only `unbalanced`; anything else is a usage error |
+| `--link-address N` | 1 | The station's link address, 0..254 |
+| `--common-address N` | 1 | Client: the common address of the requests, 0..255. Server: replaces the fixture's `station.commonAddress`, 0..254. An image whose library cannot use another common address than its link address says so with a usage error |
+
+`--remote-link-address`, `--link-address-size`, `--cot-size`, `--ca-size`,
+`--ioa-size` and `--originator-address` do not exist for IEC 103 (fixed field
+sizes, no information object addresses): they are unknown flags (exit 2).
+
+The client starts the link with a reset of the communication unit (function
+0, confirmed), which the library may precede with a request of the status of
+the link (function 9) or follow with a reset of the frame count bit (function
+7); `connected` is true when the reset was confirmed. It then fetches class 1
+data while the station sets ACD (the identification the reset queued) before
+it sends the request of the operation, and afterwards polls class 1 while ACD
+is set and class 2 otherwise, for as long as the connection is open. Every
+request is SEND/CONFIRM (function 3) unless the operation says otherwise.
+
+### IEC 103 server
+
+Flags: `--fixture` (default `/fixtures/baseline/fixture.json`, the IEC 103
+format of [FIXTURES.md](FIXTURES.md#iec-103)), `--bind-address`, `--port`
+(2401), `--ready-file`, `--link-mode`, `--link-address`, `--common-address`.
+The station's behaviour is the fixture's ([FIXTURES.md](FIXTURES.md#iec-103)).
+
+| `event` | Other fields | When |
+|---------|--------------|------|
+| `ready` | `adapter`, `address`, `fixture`, `commonAddress`, `standard` (`iec60870-5-103`), `mode` (`unbalanced`), `linkAddress` | Once, when the station accepts connections |
+| `connection-opened`, `connection-closed` | `peer` | The TCP connection |
+| `interrogation` | `commonAddress`, `scn`, `accepted` | ASDU 7 received |
+| `clock-sync` | `time`, `broadcast` (sent to link address 255) | ASDU 6 received |
+| `command` | `fun`, `inf`, `dco` (the octet), `rii`, `outcome` (`executed` or `rejected`) | ASDU 20 received |
+| `stopped` | | Once, after a clean stop |
+
+### IEC 103 client
+
+Common flags: `--host`, `--port` (2401), `--common-address`,
+`--connect-timeout-ms`, `--timeout-ms`, `--collect-ms`, `--link-mode`,
+`--link-address`. Every wait of an operation is bounded by `--timeout-ms`.
+
+| Operation | Flags | Sends | Succeeds when |
+|-----------|-------|-------|---------------|
+| `connect` | `--hold-ms N` (0) | The link start-up only | The link is still up after the hold, the client polling all the time |
+| `interrogate` | `--scn N` (0) | ASDU 7, cause 9, FUN 255, INF 0, the scan number | ASDU 8 (termination of general interrogation) with that scan number arrives: `terminated` |
+| `clock-sync` | `--time T` (now), `--broadcast` | ASDU 6, cause 8, FUN 255, INF 0, CP56Time2a. With `--broadcast` SEND/NO REPLY (function 4) to link address 255 and common address 255; only with the feature `broadcastClockSync` | Addressed: ASDU 6 with cause 8 arrives (confirmation `{cot: 8}`). Broadcast: the frame was sent; nothing can answer |
+| `command` | `--fun N`, `--inf N` (required), `--dco D` (required: 1 or `off`, 2 or `on`; 0 and 3 are sent as they are), `--rii N` (1) | ASDU 20 (general command), cause 20, the DCO and the return information identifier | ASDU 1 or 2 with the command's FUN and INF, cause 20 and the RII as SIN arrives (confirmation `{cot: 20}`). Cause 21 is the error `negative-confirmation` (confirmation `{cot: 21, negative: true}`). The change of state (ASDU 1, cause 12, clause 7.4.4) follows the confirmation: it is in `asdus` when `--collect-ms` covers it |
+| `monitor` | `--duration-ms N` (1000), `--max-asdus N` (0) | Nothing but the polls | The duration passed or the number of ASDUs arrived, with the link still up |
+
+The other operations of IEC 101 and 104 (`counter-interrogate`, `read`,
+`test-command`, files, ...) are not in `clientOperations` and are usage errors.
+An operation the library cannot carry out as defined (`--broadcast` without the
+feature) is a usage error; a request the library refuses to send for a reason of
+its own is the error `failed`.
+
+The result document is that of IEC 101: `connected` is the confirmed reset of
+the communication unit, and there is no `startdtConfirmed`. `confirmations`
+has the causes 8, 20 and 21 of the table above, `terminated` is the
+termination of the interrogation. `asdus` has every ASDU received, the
+identification after the reset included; cyclic measurands (cause 2) arrive
+whenever the client polls class 2, so their number in a result is not fixed.
+
+### IEC 103 ASDU documents
+
+The fields of [ASDU documents](#asdu-documents) with these differences:
+
+- `type` is the name below, `typeId` the type identification; `cot` is the cause
+  of transmission octet as received, 0..255 (IEC 103 has no P/N or T bit, so
+  `negative` and `test` are false and `originator` is 0). `sequence` and
+  `count` are the SQ bit and the number of the VSQ octet.
+- `objects` has one entry: the information object, with `fun` (function type)
+  and `inf` (information number) instead of `ioa`, and the fields of its type.
+- An adapter decodes the information elements as the standard lays them out.
+  When their length is not the standard's, or the adapter does not decode the
+  type, the object has `data` (the elements after FUN and INF, lower-case hex)
+  instead of the fields.
+
+| `typeId` | `type` | Fields |
+|---------:|--------|--------|
+| 1 | `time-tagged-message` | `dpi` 0..3, `time32`, `sin` |
+| 2 | `time-tagged-message-relative` | `dpi`, `ret` (ms), `fan`, `time32`, `sin` |
+| 3 | `measurands-i` | `values` |
+| 4 | `time-tagged-measurands` | `scl` (short-circuit location, a number), `ret`, `fan`, `time32` |
+| 5 | `identification` | `col` (compatibility level), `ascii` (the eight characters, trailing spaces and NULs removed), `software` (four octets, hex) |
+| 6 | `time-synchronization` | `time` (CP56Time2a) |
+| 7 | `general-interrogation` | `scn` |
+| 8 | `general-interrogation-termination` | `scn` |
+| 9 | `measurands-ii` | `values` |
+| 20 | `general-command` | `dco` (the octet), `rii` |
+| 10, 11, 21, 23..31 | `generic-data`, `generic-identification`, `generic-command`, `disturbance-list`, `disturbance-order`, `disturbance-acknowledgement`, `disturbance-ready`, `channel-ready`, `tags-ready`, `tags`, `disturbance-values`, `disturbance-end` | `data` (not decoded in this version) |
+
+`time32` is a CP32Time2a, `HH:MM:SS.mmm`: it has no date. `timeInvalid: true`
+when its IV bit is set. `values` is one `{value, ov, er}` per measurand: the
+signed 13-bit value -4096..4095 and the overflow and error bits, in the order of
+the ASDU (the number of the VSQ octet).
+
+### IEC 103 capabilities
+
+`standard` `iec60870-5-103`, `transport` `tcp-stream`, `linkModes`
+`["unbalanced"]`, and `asduTypes`: `{monitor, control}`, the type
+identifications the image decodes (client) or sends (server) in each direction.
+`pointTypes` and `commandTypes` are empty. The features of IEC 101/104 are
+present and false except `generalInterrogation`, `clockSync` and
+`directCommands` (the general command); `unbalancedMode` is true and
+`balancedMode` false. IEC 103 adds:
+
+| Feature | Meaning |
+|---------|---------|
+| `generalCommand` | ASDU 20 and its confirmation |
+| `identification` | Server: ASDU 5 after a reset of the communication unit. Client: reports it |
+| `measurands` | Server: the fixture's measurands as class 2 data. Client: decodes ASDU 3 and 9 |
+| `broadcastClockSync` | `clock-sync --broadcast` (client) or a broadcast ASDU 6 is accepted (server) |
+| `genericServices` | ASDU 10, 11 and 21 (no operation in this version) |
+| `disturbanceData` | ASDU 23..31 (no operation in this version) |
+
 ## Image layout
 
 | Item | Value |
 |------|-------|
 | Image | `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`; OT Fabric's own stack is the stack `otfabric` (`own/`, not in this version) |
 | Entrypoint | `iec60870-5-interop` (`/usr/local/bin/iec60870-5-interop`) |
-| Default command | `server` |
-| Port | 2404/tcp (IEC 104), 2401/tcp (IEC 101, 102, 103) |
+| Default command | `server` (`print-capabilities` for an IEC 103 image that is a client only) |
+| Port | 2404/tcp (IEC 104), 2401/tcp (IEC 101, 102, 103); not exposed by a client-only image |
 | User | non-root, uid 10001 |
-| Fixtures | `/fixtures/<name>/fixture.json` (baked in: `baseline` and `extended`; mount over `/fixtures` to replace) |
+| Fixtures | `/fixtures/<name>/fixture.json`, the fixtures of the image's standard (IEC 104: `baseline` and `extended`; IEC 101 and 103: `baseline`); mount over `/fixtures` to replace |
 | Readiness file | `/run/iec60870-5-interop/ready` |
-| Health check | built in: `test -f /run/iec60870-5-interop/ready` |
+| Health check | built in: `test -f /run/iec60870-5-interop/ready`; none in a client-only image |
 | Licences | `/licenses/` |
 
 ## Commands
@@ -551,7 +690,7 @@ past argument parsing, including failures.
 | `elapsedMs` | number | Wall-clock duration |
 
 A mirror counts as a confirmation when it has the type of the request and
-cause 7, 9, 17 or 44..47. `negative` is true when the P/N bit is set or the
+cause 7, 9, 17 or 44..47 (IEC 103: see [IEC 103 client](#iec-103-client)). `negative` is true when the P/N bit is set or the
 cause is 17 or 44..47. Cause 17 is the refusal of IEC 62351-5 (not
 authorized).
 

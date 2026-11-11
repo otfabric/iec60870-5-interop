@@ -3,7 +3,7 @@
 Candidates for independent IEC 60870-5 reference implementations, assessed
 from their source code on 2026-11-10/11 (clones of the SHAs below). Nothing
 in this document was built or run unless a row says so; every "yes" is a
-plan, not evidence. A stack becomes a reference only after its adapter
+plan, not evidence. The IEC 103 rows were built and run. A stack becomes a reference only after its adapter
 passes the self-tests (`status: validated` in `versions.yaml`).
 
 Verdicts: **yes** = suitable as an independent oracle; **with adapter work**
@@ -51,15 +51,31 @@ text): see go-iec60870-5 docs/STANDARDS.md.
 
 ## IEC 60870-5-103
 
-| Stack | Licence | Roles | Transport | ASDUs | Verdict |
-|---|---|---|---|---|---|
-| [masarray/ARIEC103](https://github.com/masarray/ARIEC103) C# `ec08dd73` (v1.3.0) | Apache-2.0 | master + slave simulator (CLI `slave`) | serial only (System.IO.Ports) | decode 1, 2, 5-9, 20, 23; master sends 6, 7, 20, class polls; slave emits 1, 5, 8, 9 | **with adapter work**: Linux net8.0 build, socat pty, JSON wrapper; RtsEnable on a pty unverified |
-| [vitusdong/iec103-dotnet](https://github.com/vitusdong/iec103-dotnet) C# `38aa54c` | MIT | master + slave (multi-master TCP) | TCP, serial, any Stream | 1, 2, 5-11, 20, 21, 23-31 (generic services, disturbance transfer) | **with adapter work**; widest coverage. Not independent of ARIEC103 (its test oracle is a copy of it). COT 11/12 mapping differs from rs-iec60870-5: to be checked against the standard (103 table 5: 11 local operation, 12 remote operation). |
-| dscsystems/rs-iec60870-5 `cs103` | source-available | master | serial, TCP | 1-11, 20, 21 | CI-built private peer only |
-| TheBam1990/ioBroker.iec103 `b1e491a` | MIT | sniffer, master, slave | TCP, serial | | possible, heavy (ioBroker runtime) |
-| masarray/ARIEC60870 `59ebc36` | Apache-2.0 | Windows desktop tester 101/103/104 | | | not inspected for headless use |
-| XVincentX/Open103 `887ff5a5` | Apache-2.0 | master | abstract port | | no: Windows-only headers, does not compile (`Logger::ToString` undefined), DFC test always false |
-| themeyic/go-iec103 | MIT | | | | no: a renamed Modbus client |
+Re-assessed on 2026-11-11 by building and running every candidate (clones of
+the SHAs below, Docker on linux/arm64; the four adapter images were also built
+for linux/amd64 under emulation). Wire evidence is in
+[COMPATIBILITY.md](COMPATIBILITY.md#iec-60870-5-103) and
+`tests/iec103/known-bugs.tsv`. "Server" is the protection equipment
+(secondary station), "client" the control system (primary).
+
+| Stack | Licence | Built / ran | Roles here | Verdict |
+|---|---|---|---|---|
+| [vitusdong/iec103-dotnet](https://github.com/vitusdong/iec103-dotnet) C# v0.1.0 `38aa54ce` | MIT | net8 build, runs headless; TCP natively (no pty) | server, client | **adapter `iec103-vitusdong`, validated**. The only fixture-driven server of the survey, and far from the standard on the wire: interrogation replies with cause 11 and a 12-octet ASDU 1 (DPI, `FF FF FF FF`, CP56Time2a, no SIN), command confirmation as ASDU 1 cause 11 (139 for a refusal) instead of 20/21, identification without COL or software id (FUN 255, INF 80/81); measurands only as one raw value in ASDU 9; no GI flag; ignores the common address (looks the station up by link address); clock synchronization request with FUN 0. Not independent of ARIEC103: its tests use a copy of the ArIEC103 slave simulator as the oracle |
+| [masarray/ARIEC103](https://github.com/masarray/ARIEC103) C# `ec08dd73` (v1.2.31-3; props 1.3.0) | Apache-2.0 | net8 CLI builds and runs headless; **its serial transport fails on a pty**: `SerialPort` with `RtsEnable = true` throws `IOException: Inappropriate ioctl for device` in `RtsEnabledNative` before the first frame (socat pty, run 2026-11-11). Runs over TCP through its public `IByteTransport` | client | **adapter `iec103-ariec103`, validated** (client only). Master sends reset of link and reset of FCB, GI with SCN, class 1/2 polls; clock synchronization ASDU 6 carries a CP32Time2a plus one octet (5 octets, known bug), general command has no RII. The slave simulator (ran over TCP with an `IByteTransport` of ours) has a model of its own and cannot serve a fixture: fixed FUN 160/161 INF 1..3 points, animated ASDU 9 currents (one value plus a stray `00` octet), random pickup/trip events unless disabled, identification with cause 3 FUN 100 INF 2 and 24 characters, GI termination always with SCN 0, ACK (function 0) instead of status of link, no confirmation of commands or clock synchronization |
+| [masarray/ARIEC60870](https://github.com/masarray/ARIEC60870) C# `37baba35` (v3.6.8-rc.2+10) | Apache-2.0 | net8 CLI `ARIEC60870.Cli` exists (headless, 103 master and slave simulator, serial); not built separately | - | no: its 103 code is ARIEC103's (the same `Iec103MasterSession` and slave simulator, renamed); not a second peer |
+| [riclolsen/go-iecp5](https://github.com/riclolsen/go-iecp5) Go v0.4.7 `fbe6719d`, package cs103 | LICENSE file LGPL-3.0; README and cs103 file headers GPL-3.0 | builds with Go 1.27, runs headless; TCP client transport of its own (`cs101.TransportTCPClient`) | client | **adapter `iec103-goiecp5`, held at proposed** until the maintainer settles the licence (either reading allows a GPL-3.0-or-later image; not published meanwhile). Smoke and cross-stack passed. The most standard-conforming master of the survey: request status of link, reset CU, FCB 1 after reset, ASDU 1/2/3/4/5/8/9 codecs as the standard lays them out, RII matched to SIN, FUN 255 in ASDU 6/7. No SEND/NO REPLY (broadcast). Independence: fork of the thinkgos/wendy512 go-iecp5 lineage (101/104), cs103 written by the same author as dscsystems/rs-iec60870-5; no trace of ARIEC103 or vitusdong in the sources |
+| [XVincentX/Open103](https://github.com/XVincentX/Open103) C++ `887ff5a5` | Apache-2.0 | **compiles on Linux unchanged** (g++ 12 and 14) with a shim of ours: `OutputDebugStringA`, `localtime_s`, the include guard of the Windows-only `gettimeofday.h`, and `Logger::ToString`, which Open103 calls but defines nowhere in the repository; TCP `CommunicationPort` that returns one frame per `Read` | client | **adapter `iec103-open103`, validated** (client only, driven through P/Invoke). Defects seen in the source: `StatusLink` toggles the FCB though FCV is 0; `(Control & 0x40) == 1` (PRM/DFC checks) is always false; the function-type switch of `CommandTrasmission` falls through; `StationInit` polls class 1 forever when the station has no user data (the shim bounds every call); `TimeSync` takes whole seconds. It refuses to send a command whose INF does not fit the function type of the identification, so against vitusdong (FUN 255) it sends no command |
+| [TheBam1990/ioBroker.iec103](https://github.com/TheBam1990/ioBroker.iec103) JS `b1e491a5` (0.1.6) | MIT | runs without ioBroker with a stand-in for `@iobroker/adapter-core` (20 lines) | - | no: not an IEC 103 link layer. Master: no reset of link, constant FCB (`5A`, `7B` every time), class 1 and class 2 requests sent back to back without waiting, GI with cause 6 and no SCN. Slave: does not answer link requests at all (goiecp5 got `link-init-timeout`); answers a GI with `E5` and then sends the ASDUs as unsolicited primary frames (`73`), which unbalanced transmission does not allow |
+| dscsystems/rs-iec60870-5 `cs103` | source-available | not built | - | CI-built private peer only (licence forbids redistribution) |
+| themeyic/go-iec103 | MIT | - | - | no: a renamed Modbus client |
+
+Consequences: the IEC 103 client role of a library under test has one
+fixture-driven reference server (vitusdong), whose replies deviate from the
+standard in the ways listed; the server role has four independent clients
+(goiecp5, ariec103, open103, vitusdong), of which goiecp5 is the closest to
+the standard. No open stack offers a standard-conforming IEC 103 secondary
+station; the ARIEC103 simulator is the second independent server on the wire
+but not fixture-driven ([ROADMAP.md](ROADMAP.md)).
 
 ## Passive decoding oracle
 

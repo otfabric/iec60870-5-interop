@@ -7,7 +7,8 @@
 #
 # IEC60870_5_INTEROP_VERSION selects the image tag (default: dev, the local
 # build); IEC101_LINK_MODE the link mode of the IEC 101 stations (default
-# unbalanced). An IEC 101 station serves one TCP connection at a time.
+# unbalanced). An IEC 101 or 103 station serves one TCP connection at a time.
+# The other IEC 103 images are clients only and have no service here.
 
 x-server: &server
   healthcheck:
@@ -39,6 +40,14 @@ services:
     image: ghcr.io/otfabric/iec60870-5-interop-iec101-cbsigma:${IEC60870_5_INTEROP_VERSION:-dev}
     ports:
       - "127.0.0.1:2402:2401"
+
+  # ---- IEC 60870-5-103 (FT 1.2 over TCP, unbalanced), host port 2403 ----
+  iec103-vitusdong:
+    <<: *server
+    image: ghcr.io/otfabric/iec60870-5-interop-iec103-vitusdong:${IEC60870_5_INTEROP_VERSION:-dev}
+    command: ["server"]
+    ports:
+      - "127.0.0.1:2403:2401"
 
   # ---- IEC 60870-5-104, host ports 2404.. ----
   iec104-lib60870:

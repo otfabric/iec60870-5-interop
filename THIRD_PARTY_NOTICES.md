@@ -16,6 +16,9 @@ next to the licence texts.
 | `adapters/iec104/part5/` (links pascaldekloe/part5) | GPL-3.0-or-later |
 | `adapters/iec101/lib60870/` (links lib60870-C) | GPL-3.0-or-later |
 | `adapters/iec101/cbsigma/` (links cB-Sigma/iec60870 and the modules it needs) | GPL-3.0-or-later |
+| `adapters/iec103/common/dotnet/`, `adapters/iec103/vitusdong/`, `adapters/iec103/ariec103/` (link vitusdong/iec103-dotnet, ARIEC103) | GPL-3.0-or-later |
+| `adapters/iec103/open103/` (compiles Open103's headers with its shim) | GPL-3.0-or-later |
+| `adapters/iec103/goiecp5/` (links riclolsen/go-iecp5) | GPL-3.0-or-later |
 | The published reference images | GPL-3.0 (they contain the libraries below) |
 
 The lib60870 and openmuc adapter programs are derivative works of GPL-3.0
@@ -130,6 +133,58 @@ The modules linked into the adapter binary are those `go list -deps` names
 at build time; the Dockerfile copies the licence (and NOTICE) file of every
 one of them to `/licenses/<module path>/` and fails when one has none.
 
+## Image `iec60870-5-interop-iec103-vitusdong`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| vitusdong/iec103-dotnet (Iec103) | v0.1.0, commit `38aa54ce52b0451fd073d9865c5a5ea52f975018` | MIT | https://github.com/vitusdong/iec103-dotnet |
+| System.IO.Ports, System.Text.Encoding.CodePages and their runtime packages (NuGet) | 8.0.0, content hashes in `adapters/iec103/vitusdong/packages.lock.json` | MIT | https://github.com/dotnet/runtime |
+| .NET 8 runtime and base system | `mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim`, by digest | MIT; various (Debian bookworm) | https://github.com/dotnet/dotnet-docker |
+| Adapter | this repository, `adapters/iec103/vitusdong/`, `adapters/iec103/common/dotnet/` | GPL-3.0-or-later | https://github.com/otfabric/iec60870-5-interop |
+
+Licence texts in the image: `/licenses/vitusdong-iec103-dotnet/` (LICENSE and
+NOTICE; the NOTICE names the copy of ArIEC103 in the library's tests, which is
+not in the image), `/licenses/nuget/<package>/<version>/` and
+`/licenses/dotnet-runtime-*`. Microsoft.SourceLink is a build tool of the
+library and not in the image; its `.nuspec` with the licence expression (MIT)
+is kept with the others.
+
+## Image `iec60870-5-interop-iec103-ariec103`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| masarray/ARIEC103 (ArIEC103.Core, ArIEC103.Master) | commit `ec08dd73991be646864aef55e6a5538b78129db8` (v1.2.31-3, Directory.Build.props 1.3.0) | Apache-2.0 | https://github.com/masarray/ARIEC103 |
+| System.IO.Ports and its runtime packages (NuGet) | 8.0.0, content hashes in `adapters/iec103/ariec103/packages.lock.json` | MIT | https://github.com/dotnet/runtime |
+| .NET 8 runtime and base system | `mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim`, by digest | MIT; various (Debian bookworm) | https://github.com/dotnet/dotnet-docker |
+| Adapter | this repository, `adapters/iec103/ariec103/`, `adapters/iec103/common/dotnet/` | GPL-3.0-or-later | https://github.com/otfabric/iec60870-5-interop |
+
+Licence texts in the image: `/licenses/masarray-ARIEC103/` (LICENSE, NOTICE,
+THIRD_PARTY_NOTICES.md), `/licenses/nuget/` and `/licenses/dotnet-runtime-*`.
+
+## Image `iec60870-5-interop-iec103-open103`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| XVincentX/Open103 (Open103 headers, compiled into `libopen103.so`) | commit `887ff5a5d909e9a23f94dafa2a5c4bdbb20f30ee` | Apache-2.0 | https://github.com/XVincentX/Open103 |
+| .NET 8 runtime and base system | `mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim`, by digest | MIT; various (Debian bookworm, including libstdc++) | https://github.com/dotnet/dotnet-docker |
+| Adapter and Linux shim | this repository, `adapters/iec103/open103/`, `adapters/iec103/common/dotnet/` | GPL-3.0-or-later | https://github.com/otfabric/iec60870-5-interop |
+
+Licence texts in the image: `/licenses/XVincentX-Open103/LICENSE` and
+`/licenses/dotnet-runtime-*`.
+
+## Image `iec60870-5-interop-iec103-goiecp5` (built, not published)
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| riclolsen/go-iecp5 (packages cs103, cs101, asdu, clog) | v0.4.7, commit `fbe6719d9acc9b5d90eed3b9468e7937b8ed4711` | LGPL-3.0 by its LICENSE file; its README and the cs103 file headers say GPL-3.0 | https://github.com/riclolsen/go-iecp5 |
+| go.bug.st/serial, creack/goselect, golang.org/x/sys | as in `adapters/iec103/goiecp5/go.mod` | BSD-3-Clause | Go module proxy |
+| Adapter | this repository, `adapters/iec103/goiecp5/` | GPL-3.0-or-later | https://github.com/otfabric/iec60870-5-interop |
+
+Either reading of go-iecp5's licence allows it in a GPL-3.0-or-later work; the
+image is still not published until the maintainer has settled which one
+applies (versions.yaml). The licence files of the linked modules are copied as
+for the other Go adapters; `/licenses/GPL-3.0.txt` has the GPL text.
+
 ## Corresponding source
 
 For every published image the complete corresponding source is:
@@ -140,7 +195,8 @@ For every published image the complete corresponding source is:
    instructions (the Dockerfile); and
 2. the upstream sources at exactly the versions pinned by that Dockerfile,
    `adapters/iec104/openmuc/pom.xml`, the `go.mod` of `adapters/iec104/wendy512`, `adapters/iec104/cbsigma`,
-   `adapters/iec104/part5` and `adapters/iec101/cbsigma`, recorded in [versions.yaml](versions.yaml) and
+   `adapters/iec104/part5`, `adapters/iec101/cbsigma` and `adapters/iec103/goiecp5`, the
+   `packages.lock.json` of the .NET adapters of `adapters/iec103/`, recorded in [versions.yaml](versions.yaml) and
    in the `manifest.json` of the release.
 
 `docker build -f adapters/<standard>/<adapter>/Dockerfile .` at the release tag

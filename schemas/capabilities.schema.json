@@ -53,6 +53,22 @@
     },
     "pointTypes": { "type": "array", "items": { "type": "string", "pattern": "^M_[A-Z]{2}_[A-Z]{2}_1$" } },
     "commandTypes": { "type": "array", "items": { "type": "string", "pattern": "^C_[A-Z]{2}_[A-Z]{2}_1$" } },
-    "clientOperations": { "type": "array", "items": { "type": "string" } }
-  }
+    "clientOperations": { "type": "array", "items": { "type": "string" } },
+    "asduTypes": {
+      "description": "IEC 103: the type identifications the image decodes or sends, by direction.",
+      "type": "object",
+      "required": ["monitor", "control"],
+      "additionalProperties": false,
+      "properties": {
+        "monitor": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 255 } },
+        "control": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 255 } }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "standard": { "const": "iec60870-5-103" } } },
+      "then": { "required": ["transport", "linkModes", "asduTypes"] }
+    }
+  ]
 }

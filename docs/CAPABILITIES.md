@@ -193,6 +193,59 @@ for another address. Both are permitted readings of a point-to-point
 balanced line; the smoke test therefore makes a link start-up fail with a
 link address field of another size, not with another address.
 
+## Features of the IEC 103 images
+
+All four are `linkModes` `["unbalanced"]`, `transport` `tcp-stream`, with
+`pointTypes` and `commandTypes` empty and `clientOperations` connect,
+interrogate, clock-sync, command, monitor. The IEC 101/104 features not in the
+table are false.
+
+| Feature | Meaning | vitusdong | goiecp5 | ariec103 | open103 |
+|---------|---------|:---------:|:-------:|:--------:|:-------:|
+| `roles` | | server, client | client | client | client |
+| `generalInterrogation` | ASDU 7 / 8 | yes | yes | yes | yes |
+| `clockSync` | ASDU 6, addressed | yes | yes | yes ¹ | yes ² |
+| `directCommands`, `generalCommand` | ASDU 20 and its confirmation | yes ³ | yes | yes ⁴ | yes ⁵ |
+| `identification` | ASDU 5 after the reset of the communication unit | yes ⁶ | yes | yes | yes |
+| `measurands` | Server: the fixture's measurands as class 2 data. Client: ASDU 3 and 9 | no ⁷ | yes | yes | yes |
+| `broadcastClockSync` | `clock-sync --broadcast` (SEND/NO REPLY to 255) | no | no | no | no |
+| `genericServices`, `disturbanceData` | no operation in contract 2.1 | no | no | no | no |
+| `asduTypes.monitor` (decoded) | | 1, 5, 6, 8 | 1..6, 8, 9 | 1, 2, 5..9, 20, 23 | 1, 2, 4, 5, 9, 23, 26..31 |
+| `asduTypes.control` (sent) | | 6, 7, 20 | 6, 7, 20 | 6, 7, 20 | 6, 7, 20, 24, 25 |
+
+Every client decodes the ASDU documents itself from the octets its library
+hands it (contract: the standard's layout, `data` otherwise); `asduTypes`
+says what the library knows.
+
+1. ArIEC103 sends ASDU 6 with a CP32Time2a and one zero octet instead of a
+   CP56Time2a (`tests/iec103/known-bugs.tsv`).
+2. Open103's `TimeSync` takes a `time_t`: the milliseconds of `--time` are lost.
+3. Iec103Server confirms with ASDU 1 cause 11 (known bug) and sends no
+   change of state with cause 12 after it (clause 7.4.4): its `Cot103` has
+   remote operation as 11, and the session queue that would take another
+   ASDU is private, so the adapter cannot add the report the fixture
+   specifies. It executes a command for any indication of the station, not
+   only the fixture's `commands` (it has no notion of a command list), so
+   160/18, an indication without a command, is not refused.
+4. ArIEC103's general command has no return information identifier: `--rii`
+   is accepted and not sent (known bug `ariec103-command-no-rii`).
+5. Open103 sends a command only when its INF fits the function type of the
+   station's identification (16..19 for 160, any for 128, none for 255, with
+   a fall-through in its switch); otherwise the result is the error `failed`
+   (known bug `open103-command-typical-fun`).
+6. Two ASDU 5 (INF 80 cause 4, INF 81 cause 5) of eight characters, without
+   COL and software identification (known bug).
+7. Iec103Server sends one raw 16-bit value per ASDU 9 only, so the adapter
+   gives it none of the fixture's measurands; class 2 has no data. The
+   feature is one per image, so it is false for the vitusdong client too,
+   although its documents decode ASDU 3 and 9 like the others.
+
+The server of vitusdong also has no general-interrogation flag: an indication
+with `gi: false` is left out of its station model. It finds the station by the
+link address and does not check the common address of an ASDU, so
+`--common-address` of the server must equal `--link-address` (a usage error
+otherwise).
+
 ## Rules for consumers
 
 - Read the capabilities from the image under test, not from this page.

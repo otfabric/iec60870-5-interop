@@ -11,9 +11,9 @@
 #         validated    smoke and the cross-stack run passed locally, results in
 #                      docs/COMPATIBILITY.md (and reports/ when kept)
 
-interop_version: "0.1.0"
-contract_version: "2.0"        # docs/CONTAINER_CONTRACT.md
-fixture_schema: "1.0"          # fixtures/schema/iec60870-5-fixture.schema.json
+interop_version: "0.2.0"
+contract_version: "2.1"        # docs/CONTAINER_CONTRACT.md
+fixture_schema: "1.0"          # fixtures/schema/iec60870-5-fixture.schema.json, iec60870-5-103-fixture.schema.json
 
 standards:
   iec101:
@@ -81,6 +81,87 @@ implementations:
     language: "Java"
     independent_engine: true
     note: "Native 101-over-TCP. No adapter yet (docs/ROADMAP.md)."
+
+  # ---- IEC 60870-5-103 (contract 2.1) ----
+  # Every reference server below deviates from IEC 60870-5-103 on the wire;
+  # tests/iec103/known-bugs.tsv lists how. vitusdong is the only image with a
+  # server, so the cross-stack run is every client against it.
+  iec103-vitusdong:
+    standard: iec103
+    status: validated
+    upstream: "vitusdong/iec103-dotnet"
+    repository: "https://github.com/vitusdong/iec103-dotnet"
+    version: "v0.1.0"            # latest release (tag of this commit)
+    revision: "38aa54ce52b0451fd073d9865c5a5ea52f975018"
+    license: "MIT"
+    language: "C#"
+    independent_engine: true
+    roles: [server, client]
+    link_modes: [unbalanced]
+    note: >-
+      .NET 8 master (Iec103Client) and slave (Iec103Server) on the TCP stream
+      natively. Not independent of ARIEC103: its tests use a copy of the
+      ArIEC103 slave simulator as the oracle. The server answers an
+      interrogation with cause 11 and a 12-octet ASDU 1, confirms commands
+      with cause 11, identifies without COL (tests/iec103/known-bugs.tsv),
+      and sends measurands as single raw ASDU 9 only, so it is given none.
+
+  iec103-goiecp5:
+    standard: iec103
+    status: proposed
+    upstream: "riclolsen/go-iecp5 (package cs103)"
+    repository: "https://github.com/riclolsen/go-iecp5"
+    module: "github.com/riclolsen/go-iecp5"
+    version: "v0.4.7"            # latest release
+    revision: "fbe6719d9acc9b5d90eed3b9468e7937b8ed4711"
+    license: "LGPL-3.0 (LICENSE file); GPL-3.0 (README, cs103 file headers)"
+    language: "Go"
+    independent_engine: true
+    roles: [client]
+    link_modes: [unbalanced]
+    note: >-
+      Built and run here (smoke and cross-stack passed, docs/COMPATIBILITY.md),
+      held at proposed and out of the published images until the maintainer
+      settles the licence: the LICENSE file is LGPL-3.0, the README and the
+      file headers of cs103 say GPL-3.0. A primary station only, with its own
+      TCP transport; no SEND/NO REPLY (broadcast).
+
+  iec103-ariec103:
+    standard: iec103
+    status: validated
+    upstream: "masarray/ARIEC103"
+    repository: "https://github.com/masarray/ARIEC103"
+    version: "v1.2.31-3-gec08dd7"  # git describe of the pinned commit; Directory.Build.props says 1.3.0
+    revision: "ec08dd73991be646864aef55e6a5538b78129db8"
+    license: "Apache-2.0"
+    language: "C#"
+    independent_engine: true
+    roles: [client]
+    link_modes: [unbalanced]
+    note: >-
+      Iec103MasterSession on a TCP IByteTransport of the driver: its
+      System.IO.Ports transport fails on a pseudo terminal (RtsEnable,
+      "Inappropriate ioctl for device"). Its slave simulator has a model of
+      its own and cannot serve a fixture, so the image is a client only.
+      masarray/ARIEC60870 carries the same 103 code and is not a second peer.
+
+  iec103-open103:
+    standard: iec103
+    status: validated
+    upstream: "XVincentX/Open103"
+    repository: "https://github.com/XVincentX/Open103"
+    version: "887ff5a5"          # no releases; last commit 2022-12-12
+    revision: "887ff5a5d909e9a23f94dafa2a5c4bdbb20f30ee"
+    license: "Apache-2.0"
+    language: "C++"
+    independent_engine: true
+    roles: [client]
+    link_modes: [unbalanced]
+    note: >-
+      Header-only Windows C++ master, compiled for Linux unchanged with a shim
+      of ours (adapters/iec103/open103/shim: OutputDebugStringA, localtime_s,
+      the missing Logger::ToString, a TCP CommunicationPort) and driven through
+      P/Invoke.
 
   # ---- IEC 60870-5-104 (carried over from otfabric/iec104-interop v0.6.0) ----
   iec104-lib60870:
@@ -157,12 +238,18 @@ implementations:
     roles: [server, client]
 
 dependencies:
+  nuget_system_io_ports: "8.0.0"   # iec103 vitusdong and ariec103, MIT; packages.lock.json pins the content hash
+  nuget_system_text_encoding_codepages: "8.0.0"   # iec103 vitusdong, MIT
+  go_bug_st_serial: "v1.6.4"   # iec103 goiecp5 (through cs101), BSD-3-Clause
   gson: "2.14.0"               # iec104 openmuc adapter, Apache-2.0
   cjson: "debian trixie libcjson1"     # lib60870 adapters, MIT
   mbedtls: "3.6.7"             # lib60870 adapters, Apache-2.0 OR GPL-2.0-or-later
   mbedtls_sha256: "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6"
 
 base_images:
+  # .NET 8 images of the IEC 103 adapters (mcr.microsoft.com), recorded 2026-11-11.
+  dotnet_sdk_8_bookworm_slim: "mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5"
+  dotnet_runtime_8_bookworm_slim: "mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim@sha256:21b0f8ba67bef2f121781d17a8e21956aeaa2d8da8e4b5db0da1ea8f91e2b6a1"
   # Digests recorded 2026-10-09 (iec104-interop); the Dockerfiles pin these by digest.
   debian_trixie_slim: "docker.io/library/debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
   maven_3_9_temurin_25: "docker.io/library/maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976"
@@ -172,6 +259,10 @@ base_images:
 images:
   iec101-lib60870: "ghcr.io/otfabric/iec60870-5-interop-iec101-lib60870"
   iec101-cbsigma: "ghcr.io/otfabric/iec60870-5-interop-iec101-cbsigma"
+  iec103-vitusdong: "ghcr.io/otfabric/iec60870-5-interop-iec103-vitusdong"
+  iec103-goiecp5: "ghcr.io/otfabric/iec60870-5-interop-iec103-goiecp5"    # not published (licence)
+  iec103-ariec103: "ghcr.io/otfabric/iec60870-5-interop-iec103-ariec103"
+  iec103-open103: "ghcr.io/otfabric/iec60870-5-interop-iec103-open103"
   iec104-lib60870: "ghcr.io/otfabric/iec60870-5-interop-iec104-lib60870"
   iec104-openmuc: "ghcr.io/otfabric/iec60870-5-interop-iec104-openmuc"
   iec104-wendy512: "ghcr.io/otfabric/iec60870-5-interop-iec104-wendy512"
