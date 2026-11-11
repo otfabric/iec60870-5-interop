@@ -87,6 +87,85 @@ address with a three-octet object address; a link that does not start
 
 None found for IEC 101 (`tests/iec101/known-bugs.tsv` is empty).
 
+## IEC 60870-5-102
+
+**There is no open IEC 102 controlled station, so nothing here is a
+cross-stack result.** The one image, `iec102-gisce` (gisce/iec870ree v0.14.1,
+the controlling station of the Spanish REE profile), is smoke-tested against
+`tests/iec102/meter.py`, a scripted meter written in this repository from
+CONTAINER_CONTRACT.md and FIXTURES.md ("IEC 102"). The scripted meter is
+**not an independent implementation of IEC 60870-5-102**: it answers the
+frames the contract's operations send, as the contract describes them. A pass
+shows that the image keeps the contract (flags, exit codes, documents) and
+that gisce's requests and decoding agree with the contract's frames and the
+fixture's values; it says nothing about how gisce meets real meters, and the
+contract's frames are themselves an interpretation (we hold neither IEC
+60870-5-102 nor an REE document). versions.yaml keeps the image
+`experimental`.
+
+Run locally on 2026-11-11 (linux/arm64, the `:dev` image of this commit),
+with `REPORT_DIR` set: 61 pass, 0 fail, 0 other; the capability document and
+the 18 client result documents kept validate against `schemas/` (0 errors).
+
+| Run | Command | pass | fail | other |
+|-----|---------|-----:|-----:|------:|
+| smoke gisce (client, against the scripted meter) | `scripts/smoke.sh iec102 gisce` | 61 | 0 | 0 |
+
+The 61: the capability document with its IEC 102 fields and the baked
+fixture (11); 30 usage errors that never touch the network (every flag that
+does not exist for IEC 102, field sizes the image lacks, REE operations
+without `--profile ree`, malformed times, `server` of a client-only image);
+a connection that cannot be made (exit 3); and 19 checks of operations
+against the scripted meter, each compared with the fixture (one of them that
+the result is one line): link start-up failure on another link address
+(`link-init-timeout`), `connect` with and without the REE session, a wrong
+access key (`login-refused`), `read-product`, `read-time` (the fixture's
+clock), `read-totals` absolute, incremental in a session, and two periods of
+addresses 1..3 (every period, address, value, quality octet and period end
+equal to the fixture), four refusals (causes 18, 16, 17 and 16 for another
+common address), `read-tariff` current, stored in a range and of a register
+the station lacks (cause 16), `set-time` and the time read back.
+
+What gisce sent, as its own log shows it (read-totals of one period in a
+session):
+
+```text
+10 49 01 00 4A 16                         request status of link
+10 40 01 00 41 16                         reset of remote link
+68 0D 0D 68 73 01 00 B7 01 06 01 00 00 07 00 00 00 3A 16
+                                          C_AC_NA_2, VSQ 1, cause 6, CA 1, record 0, key 7
+10 5B 01 00 5C 16                         request class 2 (FCB alternating from here)
+68 15 15 68 73 01 00 7A 01 06 01 00 0B 01 02 00 02 81 01 1A 00 02 81 01 1A 40 16
+                                          C_CI_NT_2, record 11, addresses 1..2, 2026-01-01 02:00 (Thursday) twice
+68 09 09 68 73 01 00 BB 00 06 01 00 00 36 16
+                                          C_FS_NA_2, VSQ 0
+```
+
+### Not shown by these runs
+
+- Any independent controlled station: none exists (REFERENCE_STACKS.md).
+- One-octet link or common addresses: gisce has two octets only.
+- The single character E5h: gisce cannot parse it (its frame parser raises
+  on that start octet), so it needs a station that answers with fixed
+  frames, as the contract's station does. Read in the source, not run.
+- The read commands other than C_CI_NT_2 and C_CI_NU_2, single points
+  (C_SP_NB_2), blocks (C_CB_UN_2), configuration, contracted powers and
+  special days: no operation in contract 2.2.
+- The image was built for linux/amd64 under emulation and printed its
+  version there (2026-11-11); the smoke test ran on linux/arm64 only.
+
+### Known upstream defects
+
+None recorded (`tests/iec102/known-bugs.tsv` is empty). Seen in gisce's
+source and handled by the adapter, not by the contract: `authenticate`
+returns the first frame it receives and ignores the P/N bit (the adapter
+reads the confirmation from the frames); its own TCP transport waits 5 s
+after connecting and never notices a closed connection (the adapter brings
+its own); `M_TA_VX_2` decodes the first tariff record of an ASDU only (the
+contract's station sends one per ASDU); `read_absolute_values` and its
+siblings fix the address range to 1..8 and the record to its register names
+(the adapter sets them on the request object).
+
 ## IEC 60870-5-103
 
 Run locally on 2026-11-11 (linux/arm64, `:dev` images of this commit), with

@@ -19,7 +19,8 @@ next to the licence texts.
 | `adapters/iec103/common/dotnet/`, `adapters/iec103/vitusdong/`, `adapters/iec103/ariec103/` (link vitusdong/iec103-dotnet, ARIEC103) | GPL-3.0-or-later |
 | `adapters/iec103/open103/` (compiles Open103's headers with its shim) | GPL-3.0-or-later |
 | `adapters/iec103/goiecp5/` (links riclolsen/go-iecp5) | GPL-3.0-or-later |
-| The published reference images | GPL-3.0 (they contain the libraries below) |
+| `adapters/iec102/gisce/` (imports gisce/iec870ree, AGPL-3.0) | GPL-3.0-or-later |
+| The published reference images | GPL-3.0 (they contain the libraries below); `iec102-gisce` GPL-3.0-or-later and AGPL-3.0 |
 
 The lib60870 and openmuc adapter programs are derivative works of GPL-3.0
 libraries. The wendy512 adapter links an Apache-2.0 and an LGPL-3.0 library,
@@ -185,6 +186,33 @@ image is still not published until the maintainer has settled which one
 applies (versions.yaml). The licence files of the linked modules are copied as
 for the other Go adapters; `/licenses/GPL-3.0.txt` has the GPL text.
 
+## Image `iec60870-5-interop-iec102-gisce`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| gisce/iec870ree (package `iec870ree`, Python source, unmodified, in `/opt/iec870ree`) | v0.14.1, commit `993242daa3e998c9d86948881d97835438d8bef3` | AGPL-3.0 | https://github.com/gisce/iec870ree |
+| bitstring | 3.1.5 | MIT | PyPI |
+| six | 1.17.0 | MIT | PyPI |
+| pytz | 2026.6 | MIT | PyPI |
+| python-dateutil | 4.0.0 | Apache-2.0 AND BSD-3-Clause | PyPI |
+| Python (the base image `python:3.12-slim-bookworm`, pinned by digest) | 3.12 | PSF-2.0 | https://www.python.org |
+| Adapter | this repository, `adapters/iec102/gisce/` | GPL-3.0-or-later | https://github.com/otfabric/iec60870-5-interop |
+
+The adapter imports the library; the library stays under the AGPL-3.0, which
+section 13 of the GPL-3.0 allows to be combined with a GPL-3.0 work. The image
+contains the complete source of both (Python is shipped as source), and the
+public Dockerfile, the pinned commit and `adapter.py` are the corresponding
+source; AGPL-3.0 section 13 asks for the source to be offered to users who
+interact with the program over a network, which this does (the image is a
+client and serves nobody). Licence texts in the image:
+`/licenses/gisce-iec870ree/LICENSE` (AGPL-3.0, copied from the pinned commit),
+`/licenses/pypi/<package>/` (the licence files of the PyPI packages),
+`/licenses/python-LICENSE.txt`, `/licenses/GPL-3.0.txt`. setuptools 84.2.1
+(MIT) builds bitstring and is not in the image.
+
+The scripted meter of the IEC 102 smoke test (`tests/iec102/meter.py`, MIT)
+runs in the same pinned Python image; it is not part of any published image.
+
 ## Corresponding source
 
 For every published image the complete corresponding source is:
@@ -196,7 +224,8 @@ For every published image the complete corresponding source is:
 2. the upstream sources at exactly the versions pinned by that Dockerfile,
    `adapters/iec104/openmuc/pom.xml`, the `go.mod` of `adapters/iec104/wendy512`, `adapters/iec104/cbsigma`,
    `adapters/iec104/part5`, `adapters/iec101/cbsigma` and `adapters/iec103/goiecp5`, the
-   `packages.lock.json` of the .NET adapters of `adapters/iec103/`, recorded in [versions.yaml](versions.yaml) and
+   `packages.lock.json` of the .NET adapters of `adapters/iec103/`, the
+   `requirements.txt` (versions and hashes) of `adapters/iec102/gisce`, recorded in [versions.yaml](versions.yaml) and
    in the `manifest.json` of the release.
 
 `docker build -f adapters/<standard>/<adapter>/Dockerfile .` at the release tag

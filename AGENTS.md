@@ -2,7 +2,7 @@
 
 ## What this is
 
-Independent implementations of the IEC 60870-5 family in containers behind one command-line contract (2.1), with deterministic fixtures, used as oracles by libraries and tools that implement the standards. IEC 101: lib60870-C and cB-Sigma/iec60870, FT 1.2 over one TCP connection. IEC 103 (contract 2.1, unbalanced): vitusdong/iec103-dotnet (server and client), ARIEC103, Open103 and riclolsen/go-iecp5 cs103 (clients). IEC 104: lib60870-C, OpenMUC j60870, wendy512/iec104, cB-Sigma/iec60870, pascaldekloe/part5 (from iec104-interop 0.6.0). IEC 102: survey only. Profile: **interoperability**.
+Independent implementations of the IEC 60870-5 family in containers behind one command-line contract (2.2), with deterministic fixtures, used as oracles by libraries and tools that implement the standards. IEC 101: lib60870-C and cB-Sigma/iec60870, FT 1.2 over one TCP connection. IEC 103 (contract 2.1, unbalanced): vitusdong/iec103-dotnet (server and client), ARIEC103, Open103 and riclolsen/go-iecp5 cs103 (clients). IEC 104: lib60870-C, OpenMUC j60870, wendy512/iec104, cB-Sigma/iec60870, pascaldekloe/part5 (from iec104-interop 0.6.0). IEC 102 (contract 2.2, unbalanced, REE profile): gisce/iec870ree (client only), smoke-tested against the scripted meter tests/iec102/meter.py, which is not an implementation of IEC 102 (no open controlled station exists). Profile: **interoperability**.
 
 ## Organisation standards
 
@@ -37,7 +37,7 @@ This repository follows **otfabric/engineering policy 1.2**, profile **interoper
 | When you change… | Run |
 |---|---|
 | anything | `make validate lint` |
-| an adapter | `make image-<standard>-<stack> smoke-<standard>-<stack>` (IEC 101: also `LINK_MODE=balanced`) |
+| an adapter | `make image-<standard>-<stack> smoke-<standard>-<stack>` (IEC 101: also `LINK_MODE=balanced`; IEC 102: against the scripted meter) |
 | cross-stack behaviour | `make interop-iec101`, `make interop-iec103`, `make interop-iec104` |
 | documents or the contract | `make documents` |
 

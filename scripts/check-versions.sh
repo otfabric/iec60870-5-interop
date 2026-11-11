@@ -79,6 +79,19 @@ if [[ "${cb101}" != "$(sed -nE 's|^require github.com/cB-Sigma/iec60870 (v[^ ]+)
     echo "FAIL iec101 iec60870 version: Dockerfile and go.mod disagree"
     status=1
 fi
+# ---- IEC 102 ----
+gd=adapters/iec102/gisce
+need "iec102 gisce python"   "$(arg ${gd}/Dockerfile PYTHON_DIGEST)"
+need "iec102 gisce version"  "version: \"$(sed -nE 's/^ARG IEC870REE_VERSION=(.*)$/\1/p' ${gd}/Dockerfile | head -1)\""
+need "iec102 gisce revision" "$(sed -nE 's/^ARG IEC870REE_SHA=(.*)$/\1/p' ${gd}/Dockerfile | head -1)"
+if [[ "$(grep -c '^ARG IEC870REE_SHA=' ${gd}/Dockerfile)" != 2 || "$(sed -nE 's/^ARG IEC870REE_SHA=(.*)$/\1/p' ${gd}/Dockerfile | sort -u | wc -l | tr -d ' ')" != 1 ]]; then
+    echo "FAIL iec102 gisce: the two stages of the Dockerfile pin different revisions"
+    status=1
+fi
+need "iec102 meter python"   "$(sed -nE 's/.*python:3.12-slim-bookworm@(sha256:[0-9a-f]+).*/\1/p' scripts/smoke-iec102.sh | head -1)"
+while read -r pkg ver; do
+    need "iec102 gisce ${pkg}" "pypi_${pkg//-/_}: \"${ver}\""
+done < <(sed -nE 's/^([a-z-]+)==([^ ]+).*/\1 \2/p' ${gd}/requirements.txt ${gd}/build-requirements.txt)
 # ---- IEC 103 ----
 gi=$(arg adapters/iec103/goiecp5/Dockerfile GOIECP5_VERSION)
 need "iec103 goiecp5 golang" "$(arg adapters/iec103/goiecp5/Dockerfile GOLANG_DIGEST)"

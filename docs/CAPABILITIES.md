@@ -48,6 +48,8 @@ One JSON object on one line ([schema](../schemas/capabilities.schema.json)):
 | `pointTypes` | Point types a fixture may use with this adapter |
 | `commandTypes` | Command types a fixture may use; the CP56Time2a variant of each is accepted too when `timeTaggedCommands` is true |
 | `clientOperations` | Operations of `client` |
+| `asduTypes` | IEC 102 and 103: the type identifications the image decodes (`monitor`) and sends (`control`) |
+| `linkAddressSizes`, `caSizes`, `profiles` | IEC 102: the link address and common address sizes and the profiles (`standard`, `ree`) the image supports ([contract](CONTAINER_CONTRACT.md#iec-102-capabilities)) |
 
 ## Features of the IEC 104 images
 
@@ -192,6 +194,48 @@ accepts frames carrying any link address; cB-Sigma's station ignores frames
 for another address. Both are permitted readings of a point-to-point
 balanced line; the smoke test therefore makes a link start-up fail with a
 link address field of another size, not with another address.
+
+## Features of the IEC 102 images
+
+One image, a client (controlling station) only: there is no open IEC 102
+controlled station ([REFERENCE_STACKS.md](REFERENCE_STACKS.md)).
+
+| Item | gisce |
+|------|:-----:|
+| `roles` | client |
+| `linkModes` | unbalanced |
+| `linkAddressSizes`, `caSizes` | `[2]`, `[2]` ¹ |
+| `profiles` | standard, ree |
+| `clientOperations` | connect, read-totals, read-time, set-time, read-product, read-tariff |
+| `integratedTotals` (C_CI_NT_2, C_CI_NU_2) | yes ² |
+| `readTime` (C_TI_NA_2), `productIdentification` (C_RD_NA_2) | yes |
+| `setTime`, `clockSync` (C_CS_TA_2) | yes ³ |
+| `tariffInformation` (C_TA_VC_2, C_TA_VM_2) | yes ⁴ |
+| `reeSession` (C_AC_NA_2, C_FS_NA_2) | yes ⁵ |
+| `asduTypes.monitor` (decoded) | 8, 11, 71, 72, 135, 136 |
+| `asduTypes.control` (sent) | 100, 103, 122, 123, 133, 134, 181, 183, 187 |
+
+1. gisce/iec870ree packs the link address and the measuring point address as
+   two octets (`struct "H"`) and parses received frames the same way; other
+   sizes are usage errors.
+2. The library's `read_absolute_values` / `read_incremental_values` take a
+   register name (11, 12, 21) and always ask for addresses 1..8; the adapter
+   runs the same five calls with `--record`, `--first` and `--last` set on
+   the library's request object. It decodes M_IT_TG_2 and M_IT_TK_2 only
+   (4-octet totals without a signature octet, one common time a).
+3. The library writes the SU bit of the time b from the rules of
+   Europe/Madrid, whatever the time zone of the container; it sets the time
+   it is given (the adapter passes `--time` to `C_CS_TA_2`, the library's own
+   `set_datetime` sends the current time).
+4. `M_TA_VX_2` decodes the first 63-octet record of an ASDU only: a station
+   must send one record per ASDU (as the fixture behaviour does). The times
+   of a record reach the adapter as the library's datetimes, so their SU bit
+   is not reported.
+5. `authenticate` returns whatever frame came first and the library does not
+   look at the P/N bit; the adapter reads the confirmation from the recorded
+   frames, so a refused key is `login-refused`. The library cannot parse the
+   single character E5h (it raises on that start octet): a station must
+   answer with fixed frames.
 
 ## Features of the IEC 103 images
 

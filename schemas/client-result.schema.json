@@ -11,7 +11,8 @@
     "adapter": { "type": "string" },
     "operation": {
       "enum": ["connect", "interrogate", "counter-interrogate", "read", "clock-sync", "test-command", "command",
-               "monitor", "file-get", "file-put", "file-dir", "redundancy"]
+               "monitor", "file-get", "file-put", "file-dir", "redundancy",
+               "read-totals", "read-time", "set-time", "read-product", "read-tariff"]
     },
     "ok": { "type": "boolean" },
     "error": {
@@ -23,7 +24,7 @@
           "properties": {
             "code": {
               "enum": ["connect-failed", "startdt-timeout", "stopdt-timeout", "link-init-timeout", "timeout", "negative-confirmation",
-                       "connection-lost", "security-failed", "tls-failed", "failed"]
+                       "connection-lost", "security-failed", "tls-failed", "login-refused", "failed"]
             },
             "message": { "type": "string" }
           }
@@ -40,14 +41,21 @@
         "required": ["cot", "negative"],
         "properties": {
           "cot": {
-            "description": "IEC 101/104: 7, 9, 17, 44..47. IEC 103: 8 (clock synchronization), 20 and 21 (general command).",
-            "enum": [7, 8, 9, 17, 20, 21, 44, 45, 46, 47]
+            "description": "IEC 101/104: 7, 9, 17, 44..47. IEC 102: 7 and the refusals 13..18. IEC 103: 8 (clock synchronization), 20 and 21 (general command).",
+            "enum": [7, 8, 9, 13, 14, 15, 16, 17, 18, 20, 21, 44, 45, 46, 47]
           },
           "negative": { "type": "boolean" }
         }
       }
     },
     "terminated": { "type": "boolean" },
+    "session": {
+      "description": "IEC 102 with --profile ree: the session start (C_AC_NA_2) and end (C_FS_NA_2) were confirmed.",
+      "type": "object",
+      "required": ["login", "logout"],
+      "additionalProperties": false,
+      "properties": { "login": { "type": "boolean" }, "logout": { "type": "boolean" } }
+    },
     "secured": { "description": "With --secure only: the association was established.", "type": "boolean" },
     "tls": { "description": "With --tls only: STARTDT con arrived over the TLS session.", "type": "boolean" },
     "file": {
@@ -100,6 +108,10 @@
       "else": { "properties": { "error": { "type": "object" } } } }
   ],
   "$defs": {
+    "localTimeA": {
+      "description": "IEC 102: time a, the station's local time to the minute, without a zone.",
+      "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$"
+    },
     "asdu": {
       "type": "object",
       "required": ["type", "typeId", "cot", "negative", "test", "originator", "commonAddress", "sequence", "count",
@@ -115,6 +127,11 @@
         "test": { "type": "boolean" },
         "originator": { "type": "integer", "minimum": 0, "maximum": 255 },
         "commonAddress": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "record": { "type": "integer", "minimum": 0, "maximum": 255, "description": "IEC 102: the record address" },
+        "time": { "$ref": "#/$defs/localTimeA", "description": "IEC 102 integrated totals: the common time tag (time a), the end of the period" },
+        "su": { "type": "boolean", "description": "IEC 102: the summer time bit of time" },
+        "timeInvalid": { "type": "boolean", "description": "IEC 102: the IV bit of time" },
+        "data": { "type": "string", "pattern": "^([0-9a-f]{2})*$", "description": "IEC 102: the octets after the record address of a type the adapter does not model" },
         "sequence": { "type": "boolean" },
         "count": { "type": "integer", "minimum": 0, "maximum": 127 },
         "objects": {
@@ -122,17 +139,40 @@
           "items": {
             "type": "object",
             "description": "IEC 101/104: an information object, by its address. IEC 103: the information object of the ASDU, by function type and information number.",
-            "anyOf": [{ "required": ["ioa"] }, { "required": ["fun", "inf"] }],
+            "anyOf": [{ "required": ["ioa"] }, { "required": ["fun", "inf"] },
+                      { "required": ["address"] }, { "required": ["time", "su"] }, { "required": ["standard", "manufacturer", "product"] },
+                      { "required": ["first", "last", "from", "to"] }, { "required": ["from", "to"] }],
             "properties": {
               "ioa": { "type": "integer", "minimum": 0, "maximum": 16777215 },
               "value": { "type": ["boolean", "number"] },
               "normalized": { "type": "number" },
-              "quality": { "type": "array", "items": { "enum": ["OV", "BL", "SB", "NT", "IV", "CY", "CA"] } },
+              "quality": {
+                "description": "IEC 101/104: the flags. IEC 102: the quality descriptor octet as received.",
+                "oneOf": [
+                  { "type": "array", "items": { "enum": ["OV", "BL", "SB", "NT", "IV", "CY", "CA"] } },
+                  { "type": "integer", "minimum": 0, "maximum": 255 }
+                ]
+              },
               "transient": { "type": "boolean" },
               "sequence": { "type": "integer" },
               "select": { "type": "boolean" },
               "qualifier": { "type": "integer" },
-              "time": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" },
+              "time": {
+                "description": "IEC 101/104: CP56Time2a in UTC. IEC 102: time b, the station's local time without a zone.",
+                "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z?$"
+              },
+              "su": { "type": "boolean", "description": "IEC 102: the summer time bit of time" },
+              "address": { "type": "integer", "minimum": 0, "maximum": 255, "description": "IEC 102: the address of an integrated total or a tariff record" },
+              "standard": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "manufacturer": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "product": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+              "first": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "last": { "type": "integer", "minimum": 0, "maximum": 255 },
+              "from": { "$ref": "#/$defs/localTimeA" },
+              "to": { "$ref": "#/$defs/localTimeA" },
+              "maxPowerTime": { "$ref": "#/$defs/localTimeA" },
+              "periodStart": { "$ref": "#/$defs/localTimeA" },
+              "periodEnd": { "$ref": "#/$defs/localTimeA" },
               "timeInvalid": { "type": "boolean" },
               "qoi": { "type": "integer" },
               "qcc": { "type": "integer" },

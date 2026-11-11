@@ -36,16 +36,18 @@ them are controlling stations (masters) only.
 
 | Stack | Licence | Roles | Type IDs seen in code | Verdict |
 |---|---|---|---|---|
-| [gisce/iec870ree](https://github.com/gisce/iec870ree) Python `993242da` (PyPI 0.14.1) | AGPL-3.0 | master | 1, 8, 11, 71, 72, 100, 102, 103, 122, 123, 133-136, 140-142, 144, 145, 147, 148, 150, 151, 156, 157, 162, 163, 181, 183, 187, 190 | **with adapter work**: Python CLI wrapper; controlling-station oracle for the REE profile against our controlled station |
+| [gisce/iec870ree](https://github.com/gisce/iec870ree) Python `993242da` (PyPI 0.14.1) | AGPL-3.0 | master | 1, 8, 11, 71, 72, 100, 102, 103, 122, 123, 133-136, 140-142, 144, 145, 147, 148, 150, 151, 156, 157, 162, 163, 181, 183, 187, 190 | **adapter `iec102-gisce`** (contract 2.2, experimental): controlling-station oracle for the REE profile against a controlled station under test; link and common address of two octets only; cannot parse the single character E5h |
 | javierdelapuente/reeprotocol `d64166ce` | AGPL-3.0 | master | 183, 187, 123, 11 | no: archived, superseded by gisce/iec870ree |
 | daiiniel/IEC60870-5-102 C# `a268d45b` | **none** | master | REE profile (183 login, 187 logout, ...) | no: no licence (all rights reserved) |
 | sennet-info/simulador_IEC102 `6cca515` | **none** | meter (controlled) simulator, PySide6 GUI | 8, 11, 71, 72, 100, 103, 122, 123, 156, 157, 162, 163, 183, 187 | no: no licence, GUI |
 | 0x7A77/IEC Go | none | master | | no: no licence |
 
 Consequences: the IEC 102 controlled-station role can be checked against
-gisce/iec870ree; the controlling-station role has no independent peer and
-is validated by specification-derived tests and scripted peers (fixtures),
-documented as such. Wireshark has no IEC 102 dissector. The base-standard
+gisce/iec870ree (the image `iec102-gisce`); the controlling-station role has
+no independent peer and is validated by specification-derived tests and
+scripted peers (fixtures), documented as such. The harness's own self-test
+of the gisce image runs against such a scripted peer, `tests/iec102/meter.py`
+(docs/COMPATIBILITY.md). Wireshark has no IEC 102 dissector. The base-standard
 type table is not verified against IEC 60870-5-102 (we do not hold the
 text): see go-iec60870-5 docs/STANDARDS.md.
 

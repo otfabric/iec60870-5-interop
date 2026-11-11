@@ -1,6 +1,6 @@
 # Container contract
 
-Version: **2.1** (`contract_version` in [versions.yaml](../versions.yaml))
+Version: **2.2** (`contract_version` in [versions.yaml](../versions.yaml))
 
 Every adapter image exposes the same commands, flags, JSON documents and exit
 codes, for each standard of the IEC 60870-5 family it implements. Consumers
@@ -14,6 +14,7 @@ a reader of 1.3 documents reads 2.0 documents unchanged.
 
 | Version | Change |
 |---------|--------|
+| 2.2 | [IEC 102](#iec-102): unbalanced only, link address and common address of two octets by default (`--link-address-size`, `--ca-size`), `--profile standard\|ree` and `--access-key` (the REE session C_AC_NA_2 / C_FS_NA_2 around every operation, `session` in results, the error `login-refused`); the client operations `connect`, `read-totals` (`--kind`, `--record`, `--from`, `--to`, `--first`, `--last`), `read-time`, `read-product`, `set-time` (`--time`), `read-tariff` (`--register`, `--from`, `--to`); ASDU documents of IEC 102 (`record`, local times a and b with `su`, integrated totals with the quality octet, tariff records); confirmations with the causes 13..18; the server events of IEC 102; `linkAddressSizes`, `caSizes`, `profiles` and the IEC 102 features in capability documents; the IEC 102 fixture. The image `iec102-gisce` (client only) |
 | 2.1 | [IEC 103](#iec-103): unbalanced only, a one-octet link address, no information object addresses; the client operations `connect`, `interrogate` (`--scn`), `clock-sync` (`--broadcast`), `command` (`--fun`, `--inf`, `--dco`, `--rii`), `monitor`; ASDU documents of IEC 103 (`fun`, `inf`, `dpi`, `sin`, `time32`, `values`, ...), `asduTypes` and the IEC 103 features in capability documents; confirmations with causes 8, 20 and 21; server events of IEC 103. An image may be a client only (`roles.server` false): `server` is then a usage error |
 | 2.0 | One repository for the IEC 60870-5 family (`iec60870-5-interop`, from `iec104-interop` 0.6.0, contract 1.3). Image `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`; entrypoint `/usr/local/bin/iec60870-5-interop`; readiness file `/run/iec60870-5-interop/ready`. `standard` in capability documents (and `transport`, `linkModes` for the serial standards). [IEC 101, 102 and 103](#iec-101-102-and-103): the FT 1.2 byte stream over one TCP connection, port 2401, the [link flags](#link-flags), the error `link-init-timeout`, results without `startdtConfirmed`; C_TS_NA_1 in ASDU documents (`fbp`). IEC 104 is contract 1.3 under the new names |
 | 1.3 | (iec104-interop) Interrogation groups, `pointQualityOnBitstring`, the fixture `extended`; the transport security flags of IEC 62351-3; `file-put`, `file-dir`, uploads, F_DR_TA_1; redundancy groups |
@@ -33,6 +34,7 @@ What a *station* does with a request is defined by its fixture: see
 - [Standards and images](#standards-and-images)
 - [IEC 101, 102 and 103](#iec-101-102-and-103)
 - [IEC 103](#iec-103)
+- [IEC 102](#iec-102)
 - [Image layout](#image-layout)
 - [Commands](#commands)
 - [Security flags](#security-flags)
@@ -57,14 +59,15 @@ What a *station* does with a request is defined by its fixture: see
 An image implements one standard with one stack:
 `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`, for example
 `iec60870-5-interop-iec101-lib60870` and `iec60870-5-interop-iec104-lib60870`.
-Images of this version: IEC 101 `lib60870`, `cbsigma`; IEC 103 `vitusdong`
-(server and client), `goiecp5`, `ariec103`, `open103` (clients); IEC 104
-`lib60870`, `openmuc`, `wendy512`, `cbsigma`, `part5`. There are no IEC 102
-images yet ([ROADMAP.md](ROADMAP.md)); its row defines the names only.
+Images of this version: IEC 101 `lib60870`, `cbsigma`; IEC 102 `gisce`
+(client); IEC 103 `vitusdong` (server and client), `goiecp5`, `ariec103`,
+`open103` (clients); IEC 104 `lib60870`, `openmuc`, `wendy512`, `cbsigma`,
+`part5`.
 
 Everything after the sections on IEC 101, 102 and 103 is written for IEC 104
 (it is contract 1.3) and applies to the serial standards except where those
-sections say otherwise. For IEC 103, [its own section](#iec-103) comes first.
+sections say otherwise. For IEC 103 and IEC 102, their own sections
+([IEC 103](#iec-103), [IEC 102](#iec-102)) come first.
 
 ## IEC 101, 102 and 103
 
@@ -96,7 +99,8 @@ station and connects with `--host` and `--port`.
 
 Accepted by `server` and by every `client` operation of a serial standard,
 with the same meaning on both sides; both sides must be given the same
-values.
+values. IEC 103 and IEC 102 replace this table with their own
+([IEC 103 link](#iec-103-link), [IEC 102 link](#iec-102-link)).
 
 | Flag | Default | Meaning |
 |------|---------|---------|
@@ -321,16 +325,185 @@ present and false except `generalInterrogation`, `clockSync` and
 | `genericServices` | ASDU 10, 11 and 21 (no operation in this version) |
 | `disturbanceData` | ASDU 23..31 (no operation in this version) |
 
+## IEC 102
+
+IEC 60870-5-102, the companion standard for the transmission of integrated
+totals (energy meter readings). The [transport](#transport) is that of IEC 101:
+the FT 1.2 byte stream over one TCP connection, port **2401**, one connection
+at a time, every connection a line that has just come up. The **server is the
+integrated total station** (the meter or data concentrator, the secondary
+station) and the **client the controlling station** (the primary station).
+What this section does not change is as for IEC 101.
+
+This repository holds no text of IEC 60870-5-102 and no document of the
+Spanish REE profile. The frames below are those the open implementations
+([REFERENCE_STACKS.md](REFERENCE_STACKS.md)) and recorded meter traffic agree on, with the
+telegram structure, type identifications and causes of the Beckhoff TS650x
+manual (vendor documentation of a commercial IEC 102 master); they are the
+contract's, not a claim about the standard.
+
+Every open IEC 102 stack is a controlling station, so an IEC 102 image may be
+a client only (`roles.server` false): `server` is then a usage error (exit 2)
+and the image has no health check or default server. No image of this
+version has a server; the [server section](#iec-102-server) says what one must
+do.
+
+### IEC 102 link
+
+Unbalanced transmission only. The controlling station uses the functions 9
+(request status of link), 0 (reset of remote link), 3 (user data, confirm) and
+11 (request class 2 data); the station answers with fixed frames (ACK,
+function 0; status of link, 11; no data, 9) and user data (8). A station
+answers with fixed frames, not with the single character E5h; a client should
+accept both.
+
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--link-mode M` | `unbalanced` | Only `unbalanced`; anything else is a usage error |
+| `--link-address N` | 1 | The station's link address: 0..65534 with two octets, 0..254 with one |
+| `--link-address-size N` | **2** | Octets of the link address field: 1 or 2 (two in the REE profile and the recorded traffic). A size not in the image's `linkAddressSizes` is a usage error |
+| `--common-address N` | 1 | The measuring point address (common address of the ASDU). Client: of the requests. Server: replaces the fixture's `station.commonAddress` |
+| `--ca-size N` | **2** | Octets of the common address: 1 or 2. A size not in the image's `caSizes` is a usage error |
+| `--profile P` | `standard` | `standard` or `ree` (the Spanish REE profile: a session around every operation, the REE operations). A profile not in the image's `profiles` is a usage error |
+| `--access-key N` | | REE: the access key of the measuring point, 0..4294967295 (four octets). Required with `--profile ree`, a usage error without it |
+
+The cause of transmission has one octet (cause in bits 0-5, P/N bit 6, T bit
+7) and there is no originator address or information object address:
+`--remote-link-address`, `--cot-size`, `--ioa-size` and `--originator-address`
+are unknown flags (exit 2).
+
+The client starts the link with a request of the status of the link and a
+reset of the remote link; `connected` is true when the reset was confirmed.
+Every request is user data with confirm (function 3); after it the client
+polls class 2 until the answer of the operation is complete. The station
+answers every request with class 2 data only.
+
+**Times.** IEC 102 time tags are the station's local time with a summer time
+bit (SU), not UTC. *Time a* (CP40Time2a, five octets) is written
+`YYYY-MM-DDTHH:MM`, *time b* (CP56Time2b, time a preceded by milliseconds and
+seconds) `YYYY-MM-DDTHH:MM:SS.mmm`, both without a zone. The years are
+2000..2099. The SU and IV bits are reported beside a time (`su`,
+`timeInvalid`); the SU bit of a time a client sends is its library's choice
+(an image says how in its notes).
+
+**REE session.** With `--profile ree` the client starts a session after the
+link start-up: C_AC_NA_2 (type 183, cause 6, record address 0, the access key
+as four octets little-endian), which the station confirms with cause 7, or
+refuses with cause 7 and the P/N bit (the error `login-refused`; nothing else
+is sent). After the operation, whether it succeeded or not, the client ends
+the session with C_FS_NA_2 (type 187, cause 6, no object), confirmed with
+cause 7. The result has `session: {login, logout}`, each true when its
+confirmation arrived and was positive; an operation succeeds only when both
+were.
+
+### IEC 102 client
+
+Common flags: `--host`, `--port` (2401), `--connect-timeout-ms`,
+`--timeout-ms` and the [link flags](#iec-102-link). Every wait of an
+operation is bounded by `--timeout-ms`. There is no `--collect-ms`.
+
+| Operation | Flags | Sends | Succeeds when |
+|-----------|-------|-------|---------------|
+| `connect` | | The link start-up (and the REE session) only | The link started (and the session was confirmed) |
+| `read-totals` | `--kind K` (`absolute`), `--record N` (11), `--from T`, `--to T` (required, time a), `--first N` (1), `--last N` (8) | `absolute`: C_CI_NT_2 (122, operational integrated totals), `incremental`: C_CI_NU_2 (123, periodically reset operational integrated totals); cause 6, record address `--record`, the first and last integrated total address and the two times a | Confirmation (cause 7) and activation termination (cause 10) of the request. In between the integration periods arrive as M_IT_TG_2 (8) or M_IT_TK_2 (11), cause 5 |
+| `read-time` | | C_TI_NA_2 (103), cause 5, no object | M_TI_TA_2 (72), cause 5, arrives |
+| `read-product` | | C_RD_NA_2 (100), cause 5, no object | P_MP_NA_2 (71), cause 5, arrives |
+| `set-time` | `--time T` (required, time b). REE only | C_CS_TA_2 (181), cause 6, record address 0, the time b | Confirmation (cause 7) |
+| `read-tariff` | `--register N` (134), `--from T` and `--to T` (time a, both or neither). REE only | Without times C_TA_VC_2 (133, current values, no object); with them C_TA_VM_2 (134, stored values, the two times a); cause 6, record address `--register` (134..136 contracts I..III, 137..139 the latent ones) | Confirmation (cause 7) and activation termination (cause 10). In between the records arrive as M_TA_VC_2 (135) or M_TA_VM_2 (136), cause 5 |
+
+"REE only" operations are usage errors without `--profile ree`. The other
+operations of IEC 101/103/104 are not in `clientOperations` and are usage
+errors. A time that is not of the form above, `--from` later than `--to` or
+`--first` larger than `--last` is a usage error.
+
+The result document is that of IEC 101 with `session` added for
+`--profile ree`. `confirmations` has the mirrors of the operation's request
+(not of the session requests) with cause 7 or a cause of refusal 13..18 or the
+P/N bit; `negative` is true for the P/N bit or a cause 13..18. `terminated` is
+the activation termination (cause 10) of the request. `asdus` has every ASDU
+received, the session's mirrors included.
+
+| `error.code` | Meaning | Exit |
+|--------------|---------|------|
+| `connect-failed` | No TCP connection | 3 |
+| `link-init-timeout` | TCP connected, but the link start-up was not confirmed within `--timeout-ms` | 3 |
+| `connection-lost` | The connection closed during the link start-up (exit 3) or later (exit 1) | 3 or 1 |
+| `login-refused` | REE: the station refused the access key (P/N bit or a cause 13..18 on C_AC_NA_2), or did not confirm it | 1 |
+| `negative-confirmation` | The station refused the request: P/N bit or a cause 13..18 | 1 |
+| `timeout` | An answer, confirmation or termination (or the confirmation of the end of the session) did not arrive in time | 1 |
+| `failed` | Anything else, such as a frame the library cannot parse; see `message` | 1 |
+
+### IEC 102 ASDU documents
+
+The fields of [ASDU documents](#asdu-documents) with these differences:
+`type` is the mnemonic (REE names for 128..255, `null` for a type the adapter
+does not know), `cot` the cause (6 bits), `negative` and `test` the P/N and T
+bits, `originator` 0, `commonAddress` the measuring point address, `record`
+the record address (an octet), `sequence` and `count` the SQ bit and the
+number of the VSQ octet.
+
+| `typeId` | `type` | `objects`, and fields of the ASDU |
+|---------:|--------|-----------------------------------|
+| 2..13 | `M_IT_TA_2` .. `M_IT_TM_2` (8: `M_IT_TG_2`, 11: `M_IT_TK_2`) | One `{address, value, quality}` per integrated total: the address 1..255, the counter reading (unsigned), the quality descriptor octet as received (IV bit 7, CA bit 6, CY bit 5; bits 0-4 a sequence number, or in the REE profile VH, MP, IN, AL and a reserved bit). The ASDU has `time` (the common time tag, time a: the end of the integration period), `su` and `timeInvalid` |
+| 71 | `P_MP_NA_2` | One `{standard, manufacturer, product}`: the first octet (edition of the standard), the manufacturer code (an octet) and the product code (four octets) |
+| 72 | `M_TI_TA_2` | One `{time, su, timeInvalid}`: the station's clock, time b |
+| 122, 123 | `C_CI_NT_2`, `C_CI_NU_2` (mirrors) | One `{first, last, from, to}` |
+| 134 | `C_TA_VM_2` (mirror) | One `{from, to}` |
+| 135, 136 | `M_TA_VC_2`, `M_TA_VM_2` | One object per tariff record (63 octets): `address`, `activeAbs`, `activeInc`, `activeQuality`, `reactiveIndAbs`, `reactiveIndInc`, `reactiveIndQuality`, `reactiveCapAbs`, `reactiveCapInc`, `reactiveCapQuality`, `maxPower`, `maxPowerTime` (time a), `maxPowerQuality`, `excessPower`, `excessPowerQuality`, `periodStart`, `periodEnd` (times a). The two reserved totals are not reported |
+| 181 | `C_CS_TA_2` (mirror) | One `{time, su, timeInvalid}`, time b |
+| 100, 103, 133, 183, 187 | `C_RD_NA_2`, `C_TI_NA_2`, `C_TA_VC_2`, `C_AC_NA_2`, `C_FS_NA_2` (mirrors) | None (the access key is not reported) |
+| other | | None; the ASDU has `data`, the octets after the record address in lower-case hex |
+
+### IEC 102 server
+
+Flags: `--fixture` (default `/fixtures/baseline/fixture.json`, the IEC 102
+format of [FIXTURES.md](FIXTURES.md#iec-102)), `--bind-address`, `--port`
+(2401), `--ready-file` and the [link flags](#iec-102-link) except
+`--access-key` (the fixture has the key). The station's behaviour is the
+fixture's ([FIXTURES.md](FIXTURES.md#iec-102)).
+
+| `event` | Other fields | When |
+|---------|--------------|------|
+| `ready` | `adapter`, `address`, `fixture`, `commonAddress`, `standard` (`iec60870-5-102`), `mode` (`unbalanced`), `linkAddress` | Once, when the station accepts connections |
+| `connection-opened`, `connection-closed` | `peer` | The TCP connection |
+| `login` | `accepted` | C_AC_NA_2 received |
+| `logout` | | C_FS_NA_2 received |
+| `read-totals` | `typeId`, `record`, `cot` (7 or the refusal), `periods` | C_CI_NT_2 or C_CI_NU_2 received |
+| `read-tariff` | `typeId`, `register`, `cot`, `records` | C_TA_VC_2 or C_TA_VM_2 received |
+| `read-time`, `read-product` | `time` (read-time) | C_TI_NA_2, C_RD_NA_2 received |
+| `set-time` | `time`, `su` | C_CS_TA_2 received |
+| `refused` | `typeId`, `commonAddress`, `cot` | Any other request refused |
+| `stopped` | | Once, after a clean stop |
+
+### IEC 102 capabilities
+
+`standard` `iec60870-5-102`, `transport` `tcp-stream`, `linkModes`
+`["unbalanced"]`, `asduTypes` (`{monitor, control}`, as for IEC 103), and:
+`linkAddressSizes` and `caSizes` (the sizes the image supports, a subset of
+`[1, 2]`) and `profiles` (a subset of `["standard", "ree"]`). `pointTypes`
+and `commandTypes` are empty. The features of IEC 101/104 are present and
+false except `clockSync` (`set-time`); `unbalancedMode` is true and
+`balancedMode` false. IEC 102 adds:
+
+| Feature | Meaning |
+|---------|---------|
+| `integratedTotals` | `read-totals` (client) or C_CI_NT_2 and C_CI_NU_2 are served (server) |
+| `readTime` | `read-time`, C_TI_NA_2 |
+| `setTime` | `set-time`, C_CS_TA_2 (REE) |
+| `productIdentification` | `read-product`, C_RD_NA_2 |
+| `tariffInformation` | `read-tariff`, C_TA_VC_2 and C_TA_VM_2 (REE) |
+| `reeSession` | `--profile ree`: C_AC_NA_2 and C_FS_NA_2 |
+
 ## Image layout
 
 | Item | Value |
 |------|-------|
 | Image | `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`; OT Fabric's own stack is the stack `otfabric` (`own/`, not in this version) |
 | Entrypoint | `iec60870-5-interop` (`/usr/local/bin/iec60870-5-interop`) |
-| Default command | `server` (`print-capabilities` for an IEC 103 image that is a client only) |
+| Default command | `server` (`print-capabilities` for an IEC 102 or IEC 103 image that is a client only) |
 | Port | 2404/tcp (IEC 104), 2401/tcp (IEC 101, 102, 103); not exposed by a client-only image |
 | User | non-root, uid 10001 |
-| Fixtures | `/fixtures/<name>/fixture.json`, the fixtures of the image's standard (IEC 104: `baseline` and `extended`; IEC 101 and 103: `baseline`); mount over `/fixtures` to replace |
+| Fixtures | `/fixtures/<name>/fixture.json`, the fixtures of the image's standard (IEC 104: `baseline` and `extended`; IEC 101, 102 and 103: `baseline`); mount over `/fixtures` to replace |
 | Readiness file | `/run/iec60870-5-interop/ready` |
 | Health check | built in: `test -f /run/iec60870-5-interop/ready`; none in a client-only image |
 | Licences | `/licenses/` |

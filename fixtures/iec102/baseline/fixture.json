@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1.0",
+  "name": "baseline",
+  "description": "One IEC 102 integrated total station (an electricity meter, REE profile): measuring point address 1 with an access key, its product identification and a clock that stands still until it is set, three hourly integration periods of six operational integrated totals on record address 11 as absolute values (C_CI_NT_2) and as increments (C_CI_NU_2), with some quality bits set, and the tariff information of contract I (register 134): two records of current values and two billing periods of stored values.",
+  "station": {
+    "commonAddress": 1, "accessKey": 7, "clock": "2026-01-15T10:20:30.500",
+    "product": {"standard": 42, "manufacturer": 33, "product": 20261115}
+  },
+  "totals": [
+    { "record": 11, "kind": "absolute", "periods": [
+      { "end": "2026-01-01T01:00", "totals": [
+        {"address": 1, "value": 152000, "quality": 0},
+        {"address": 2, "value": 0, "quality": 0},
+        {"address": 3, "value": 3010, "quality": 0},
+        {"address": 4, "value": 0, "quality": 0},
+        {"address": 5, "value": 0, "quality": 0},
+        {"address": 6, "value": 12000, "quality": 0}
+      ] },
+      { "end": "2026-01-01T02:00", "totals": [
+        {"address": 1, "value": 152123, "quality": 16},
+        {"address": 2, "value": 0, "quality": 0},
+        {"address": 3, "value": 3021, "quality": 0},
+        {"address": 4, "value": 0, "quality": 0},
+        {"address": 5, "value": 0, "quality": 0},
+        {"address": 6, "value": 12004, "quality": 0}
+      ] },
+      { "end": "2026-01-01T03:00", "totals": [
+        {"address": 1, "value": 152250, "quality": 0},
+        {"address": 2, "value": 0, "quality": 0},
+        {"address": 3, "value": 3030, "quality": 0},
+        {"address": 4, "value": 0, "quality": 0},
+        {"address": 5, "value": 0, "quality": 0},
+        {"address": 6, "value": 12011, "quality": 128}
+      ] }
+    ] },
+    { "record": 11, "kind": "incremental", "periods": [
+      { "end": "2026-01-01T01:00", "totals": [
+        {"address": 1, "value": 118, "quality": 0},
+        {"address": 2, "value": 0, "quality": 0},
+        {"address": 3, "value": 9, "quality": 0},
+        {"address": 4, "value": 0, "quality": 0},
+        {"address": 5, "value": 0, "quality": 0},
+        {"address": 6, "value": 4, "quality": 0}
+      ] },
+      { "end": "2026-01-01T02:00", "totals": [
+        {"address": 1, "value": 123, "quality": 0},
+        {"address": 2, "value": 0, "quality": 0},
+        {"address": 3, "value": 11, "quality": 128},
+        {"address": 4, "value": 0, "quality": 0},
+        {"address": 5, "value": 0, "quality": 0},
+        {"address": 6, "value": 4, "quality": 0}
+      ] },
+      { "end": "2026-01-01T03:00", "totals": [
+        {"address": 1, "value": 127, "quality": 2},
+        {"address": 2, "value": 0, "quality": 0},
+        {"address": 3, "value": 9, "quality": 0},
+        {"address": 4, "value": 0, "quality": 0},
+        {"address": 5, "value": 0, "quality": 0},
+        {"address": 6, "value": 7, "quality": 0}
+      ] }
+    ] }
+  ],
+  "tariffs": [
+    { "register": 134,
+      "current": [
+        {"address": 1, "activeAbs": 152250, "activeInc": 3250, "activeQuality": 0, "reactiveIndAbs": 3030, "reactiveIndInc": 20, "reactiveIndQuality": 0, "reactiveCapAbs": 12011, "reactiveCapInc": 11, "reactiveCapQuality": 0, "maxPower": 52, "maxPowerTime": "2026-01-12T20:15", "maxPowerQuality": 0, "excessPower": 0, "excessPowerQuality": 0, "periodStart": "2026-01-01T00:00", "periodEnd": "2026-01-15T10:00"},
+        {"address": 2, "activeAbs": 80400, "activeInc": 1800, "activeQuality": 0, "reactiveIndAbs": 1500, "reactiveIndInc": 10, "reactiveIndQuality": 0, "reactiveCapAbs": 6000, "reactiveCapInc": 5, "reactiveCapQuality": 0, "maxPower": 48, "maxPowerTime": "2026-01-08T09:30", "maxPowerQuality": 0, "excessPower": 0, "excessPowerQuality": 0, "periodStart": "2026-01-01T00:00", "periodEnd": "2026-01-15T10:00"}
+      ],
+      "stored": [
+        {"address": 1, "activeAbs": 149000, "activeInc": 3100, "activeQuality": 0, "reactiveIndAbs": 3010, "reactiveIndInc": 90, "reactiveIndQuality": 0, "reactiveCapAbs": 11989, "reactiveCapInc": 40, "reactiveCapQuality": 0, "maxPower": 61, "maxPowerTime": "2025-12-10T19:15", "maxPowerQuality": 0, "excessPower": 0, "excessPowerQuality": 0, "periodStart": "2025-12-01T00:00", "periodEnd": "2026-01-01T00:00"},
+        {"address": 1, "activeAbs": 145900, "activeInc": 2950, "activeQuality": 128, "reactiveIndAbs": 2920, "reactiveIndInc": 85, "reactiveIndQuality": 0, "reactiveCapAbs": 11949, "reactiveCapInc": 38, "reactiveCapQuality": 0, "maxPower": 58, "maxPowerTime": "2025-11-21T18:45", "maxPowerQuality": 0, "excessPower": 0, "excessPowerQuality": 0, "periodStart": "2025-11-01T00:00", "periodEnd": "2025-12-01T00:00"}
+      ]
+    }
+  ]
+}
