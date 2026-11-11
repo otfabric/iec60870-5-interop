@@ -32,8 +32,14 @@ internal static class Program
                 case "server":
                     return Server.Run(new Args(argv.Skip(1)));
                 case "client" when argv.Length >= 2:
-                    return ClientRunner.Run(Adapter, argv[1], new Args(argv.Skip(2)), () => new VitusLink(),
-                        what => what == "broadcast" ? "Iec103Client has no SEND/NO REPLY service" : null);
+                    return ClientRunner.Run(Adapter, argv[1], new Args(argv.Skip(2)), () => new VitusLink(), what => what switch
+                    {
+                        "broadcast" => "Iec103Client has no SEND/NO REPLY service",
+                        "fun 255" => null,
+                        // DisturbanceAsdu.DisturbanceCommand writes FUN 255 into every order.
+                        _ when what.StartsWith("fun ", StringComparison.Ordinal) => "Iec103Client sends its disturbance orders with function type 255 only",
+                        _ => null,
+                    });
                 case "print-capabilities":
                     PrintCapabilities();
                     return Exit.Ok;
@@ -70,13 +76,21 @@ internal static class Program
         ["roles"] = new Dictionary<string, object?> { ["server"] = true, ["client"] = true },
         // measurands: the server sends ASDU 9 with one raw 16-bit value only,
         // so the fixture's measurands are not given to it.
-        ["features"] = ClientRunner.Features(gi: true, clockSync: true, command: true, ident: true, measurands: false, broadcast: false),
+        // disturbanceDataServer: Iec103Server sends samples it generates (a
+        // sine, DisturbanceChannel103Model.GenerateSamples) and the station's
+        // indications as tags, not the fixture's values and tags.
+        ["features"] = ClientRunner.Features(gi: true, clockSync: true, command: true, ident: true, measurands: false, broadcast: false,
+            generic: true, disturbanceList: true, disturbanceData: true, disturbanceDataServer: false),
         ["pointTypes"] = Array.Empty<string>(), ["commandTypes"] = Array.Empty<string>(),
         ["asduTypes"] = new Dictionary<string, object?>
         {
-            ["monitor"] = new[] { 1, 5, 6, 8 }, ["control"] = new[] { 6, 7, 20 },
+            ["monitor"] = new[] { 1, 5, 6, 8, 10, 23, 26, 27, 29, 30, 31 }, ["control"] = new[] { 6, 7, 10, 20, 21, 24, 25 },
         },
-        ["clientOperations"] = new[] { "connect", "interrogate", "clock-sync", "command", "monitor" },
+        ["clientOperations"] = new[]
+        {
+            "connect", "interrogate", "clock-sync", "command", "monitor", "generic-read", "generic-write", "disturbance-list",
+            "disturbance-transfer",
+        },
     });
 }
 
@@ -90,8 +104,9 @@ internal static class Versions
         .FirstOrDefault(a => a.Key == key)?.Value;
 }
 
-/// <summary>The control system: Iec103Client's synchronous link services.</summary>
-internal sealed class VitusLink : ILink103
+/// <summary>The control system: Iec103Client's synchronous link services, and its
+/// procedures of the generic services and of the transmission of disturbance data.</summary>
+internal sealed class VitusLink : ILink103, IGeneric103, IDisturbance103
 {
     private Iec103Client? _client;
     private volatile bool _closed;
@@ -137,6 +152,116 @@ internal sealed class VitusLink : ILink103
         Map(() => _client!.SendConfirmed(_address, Asdu103.GeneralCommand((byte)ca, (byte)fun, (byte)inf, dco, (byte)rii)));
 
     public void Dispose() => _client?.Dispose();
+
+    /// <summary>Runs one of Iec103Client's procedures and hands every ASDU it received to received, in order.</summary>
+    private T Capture<T>(Action<byte[]> received, List<Asdu103> seen, Func<T> procedure)
+    {
+        void On(ReceivedAsdu103 r)
+        {
+            lock (seen)
+            {
+                seen.Add(r.Asdu);
+            }
+        }
+
+        _client!.AsduReceived += On;
+        try
+        {
+            return procedure();
+        }
+        finally
+        {
+            _client.AsduReceived -= On;
+            lock (seen)
+            {
+                foreach (var a in seen)
+                {
+                    received(a.Encode());
+                }
+            }
+        }
+    }
+
+    private static Dictionary<string, object?> SetDoc(GenericDataSet103 s) =>
+        GenericDoc.Set(s.Gin.Group, s.Gin.Entry, s.Kod, s.Gdd.DataType, s.Gdd.DataWidth, s.Gdd.Number, s.Gid);
+
+    // ReadGenericEntries: ASDU 21 with the GIN and KOD, then class 1 until the
+    // ASDU 10 with its RII and the continuation bit clear.
+    public (int Cot, List<Dictionary<string, object?>> Sets) GenericRead(int ca, int group, int entry, int kod, int timeoutMs, Action<byte[]> received)
+    {
+        var seen = new List<Asdu103>();
+        var sets = Capture(received, seen, () => _client!.ReadGenericEntries(_address, (new Gin103((byte)group, (byte)entry), (byte)kod)));
+        var answer = seen.LastOrDefault(a => a.TypeId == TypeId103.GenericData && a.Cot is Cot103.GenericReadValid or Cot103.GenericReadInvalid);
+        if (answer is null)
+        {
+            throw new TimeoutException("Iec103Client.ReadGenericEntries returned without an ASDU 10 with cause 42 or 43");
+        }
+
+        var docs = sets.Select(SetDoc).ToList();
+        if (answer.Cot == Cot103.GenericReadInvalid)
+        {
+            throw new NegativeAnswerException(answer.Cot, docs, "the station answered the generic read with cause 43");
+        }
+
+        return (answer.Cot, docs);
+    }
+
+    // WriteGenericValue: ASDU 10, cause 40, one data set, then class 1 until
+    // the ASDU 10 with cause 40 or 41.
+    public (int Cot, List<Dictionary<string, object?>> Sets) GenericWrite(int ca, int group, int entry, int kod, int type, int size, string value,
+        int timeoutMs, Action<byte[]> received)
+    {
+        var gin = new Gin103((byte)group, (byte)entry);
+        var v = GenericDoc.ParseValue(type, size, value);
+        var set = type switch
+        {
+            1 => GenericDataSet103.Ascii(gin, (byte)kod, (string)v),
+            3 => GenericDataSet103.Unsigned(gin, (byte)kod, (uint)(long)v, (byte)size),
+            4 => GenericDataSet103.Signed(gin, (byte)kod, (int)(long)v, (byte)size),
+            _ => GenericDataSet103.Float(gin, (byte)kod, (float)(double)v),
+        };
+        var seen = new List<Asdu103>();
+        var ack = Capture(received, seen, () => _client!.WriteGenericValue(_address, set));
+        var answer = seen.Last(a => a.TypeId == TypeId103.GenericData && a.Cot is Cot103.GenericWriteAckPositive or Cot103.GenericWriteAckNegative);
+        var docs = new List<Dictionary<string, object?>> { SetDoc(ack) };
+        if (answer.Cot == Cot103.GenericWriteAckNegative)
+        {
+            throw new NegativeAnswerException(answer.Cot, docs, "the station answered the generic write with cause 41");
+        }
+
+        return (answer.Cot, docs);
+    }
+
+    // RequestDisturbanceList: ASDU 24 with TOO 24, then class 1 until no data.
+    public List<Dictionary<string, object?>> DisturbanceList(int ca, int fun, int timeoutMs, Action<byte[]> received)
+    {
+        var seen = new List<Asdu103>();
+        var entries = Capture(received, seen, () => _client!.RequestDisturbanceList(_address));
+        if (!seen.Any(a => a.TypeId == TypeId103.DisturbanceList))
+        {
+            throw new TimeoutException("Iec103Client.RequestDisturbanceList returned without an ASDU 23");
+        }
+
+        return entries.Select(e => Disturbances.Fault(e.Fan, e.Sof.TripProtection, e.Sof.TripCommand, e.Sof.Test, e.Sof.EquipmentStart,
+            e.FaultTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture))).ToList();
+    }
+
+    // ReadDisturbance (selection, ready, its acknowledgement, the channels)
+    // and then ReadDisturbanceTags, as Iec103Client offers them.
+    public Dictionary<string, object?> DisturbanceTransfer(int ca, int fun, int fan, int timeoutMs, Action<byte[]> received)
+    {
+        var seen = new List<Asdu103>();
+        var (readout, tags) = Capture(received, seen, () =>
+        {
+            var r = _client!.ReadDisturbance(_address, fan);
+            return (r, _client.ReadDisturbanceTags(_address, fan));
+        });
+        var t = readout.FaultTime;
+        return Disturbances.Record(readout.Fan, null, null, readout.ChannelCount, readout.SampleCount, readout.IntervalUs,
+            Disturbances.Time32(t.Second * 1000 + t.Millisecond, t.Minute, t.Hour),
+            tags.Select(x => (-1, (int)x.Fun, (int)x.Inf, x.Dpi)),
+            readout.Channels.Select(c => ((int)c.Acc, (double)c.Primary, (double)c.Secondary, (double)c.Factor, c.Samples.Select(v => (int)v))));
+    }
 }
 
 /// <summary>The protection device: one Iec103Server session per TCP connection, one at a time.</summary>
@@ -185,6 +310,24 @@ internal static class Server
             // Iec103StationModel has no general-interrogation flag: an
             // indication outside the interrogation is left out.
             Points = fx.Indications.Where(i => i.Gi).Select(i => new Iec103PointModel { Fun = i.Fun, Inf = i.Inf, Dpi = i.Dpi }).ToList(),
+            GenericEntries = fx.Generic.Select(g => new GenericEntry103Model
+            {
+                Group = g.Group, Entry = g.Entry, Description = g.Description, ReadOnly = !g.Writable,
+                DataType = g.Type switch { 1 => "ascii", 3 => "uint", 4 => "int", _ => "float" },
+                AsciiValue = g.Value as string, ActualValue = g.Value is string ? null : Convert.ToDouble(g.Value),
+                IntWidth = g.Type is 3 or 4 ? g.Size : 4,
+            }).ToList(),
+            // The list (ASDU 23) and the description of each record (ASDUs 26
+            // and 27) are the fixture's; the values and tags are not (see
+            // print-capabilities: disturbanceDataServer).
+            Disturbances = fx.Disturbances.Select(d => new DisturbanceRecord103Model
+            {
+                Fan = d.Fan, Sof = new Sof103(d.Tp, d.Tm, d.Test, d.Otev), FaultTime = d.Time, SampleIntervalUs = d.Interval,
+                Channels = d.Channels.Select(c => new DisturbanceChannel103Model
+                {
+                    Acc = c.Acc, Primary = c.Rpv, Secondary = c.Rsv, Factor = c.Rfa, SampleCount = c.Values.Count,
+                }).ToList(),
+            }).ToList(),
         };
         var workspace = new Workspace103Model { Port = port, BindAddress = bind, Stations = [station] };
 

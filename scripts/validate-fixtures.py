@@ -23,6 +23,7 @@ Usage: validate-fixtures.py [--require-schema] [fixture.json ...]
 """
 
 import json
+import struct
 import sys
 from pathlib import Path
 
@@ -70,6 +71,65 @@ def semantic_errors_103(fx):
         commands.add(key)
         if key not in indications:
             errors.append(f"command {key[0]}/{key[1]}: no indication with this function type and information number")
+    errors.extend(generic_errors_103(fx))
+    errors.extend(disturbance_errors_103(fx))
+    return errors
+
+
+def generic_errors_103(fx):
+    """Generic entries (contract 2.3): unique GIN, value of the GDD's type and size."""
+    errors = []
+    gins = set()
+    for g in fx.get("generic", []):
+        gin = g.get("gin", {})
+        key = (gin.get("group"), gin.get("entry"))
+        name = f"generic entry {key[0]}.{key[1]}"
+        if key in gins:
+            errors.append(f"{name}: duplicate GIN")
+        gins.add(key)
+        t, size, v = g.get("type"), g.get("size"), g.get("value")
+        if t == 1:
+            if not isinstance(v, str) or len(v) != size or any(not 0x20 <= ord(c) <= 0x7E for c in v):
+                errors.append(f"{name}: an ASCII value must be printable and exactly size characters long")
+        elif t in (3, 4):
+            if size not in (1, 2, 4) or isinstance(v, bool) or not isinstance(v, int):
+                errors.append(f"{name}: an integer of size 1, 2 or 4")
+            else:
+                lo, hi = (0, 2 ** (8 * size) - 1) if t == 3 else (-(2 ** (8 * size - 1)), 2 ** (8 * size - 1) - 1)
+                if not lo <= v <= hi:
+                    errors.append(f"{name}: {v} does not fit {size} octets")
+        elif t == 7:
+            if size != 4 or isinstance(v, bool) or not isinstance(v, (int, float)) or struct.unpack("<f", struct.pack("<f", v))[0] != v:
+                errors.append(f"{name}: an R32.23 of size 4 whose value is exact in single precision")
+    return errors
+
+
+def disturbance_errors_103(fx):
+    """Recorded disturbances (contract 2.3): unique FAN, tags in order with the
+    initial states at position 0, channels in ascending ACC with one NOE."""
+    errors = []
+    fans = set()
+    for d in fx.get("disturbances", []):
+        name = f"disturbance FAN {d.get('fan')}"
+        if d.get("fan") in fans:
+            errors.append(f"{name}: duplicate FAN")
+        fans.add(d.get("fan"))
+        tags = d.get("tags", [])
+        if tags and tags[0].get("pos") != 0:
+            errors.append(f"{name}: the first tags are the initial states at position 0 (clause 7.4.7)")
+        if [t.get("pos") for t in tags] != sorted(t.get("pos") for t in tags):
+            errors.append(f"{name}: tags in ascending position")
+        channels = d.get("channels", [])
+        accs = [c.get("acc") for c in channels]
+        if accs != sorted(set(accs)):
+            errors.append(f"{name}: channels in ascending, unique ACC (clause 7.4.7)")
+        noe = {len(c.get("values", [])) for c in channels}
+        if len(noe) > 1:
+            errors.append(f"{name}: every channel has the same number of values (NOE, clause 7.2.6.11)")
+        if any(t.get("pos", 0) >= max(noe or {1}) for t in tags):
+            errors.append(f"{name}: a tag position beyond the last value")
+        if len(channels) > 255:
+            errors.append(f"{name}: at most 255 channels (NOC)")
     return errors
 
 

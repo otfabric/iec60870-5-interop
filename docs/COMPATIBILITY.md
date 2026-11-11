@@ -285,11 +285,49 @@ as their own bugs (7 each) and those of goiecp5 and vitusdong as vitusdong's
   against one deviating server.
 - vitusdong is not independent of ARIEC103 (its test oracle is a copy of the
   ArIEC103 simulator), which matters for the ariec103 → vitusdong pairing.
-- Measurands (ASDU 3/9 as class 2 data), broadcast clock synchronization,
-  generic services and disturbance data: no server has them in this run.
+- Measurands (ASDU 3/9 as class 2 data) and broadcast clock synchronization:
+  no server has them in this run; generic services and disturbance data: see
+  below.
 - The images of the four IEC 103 adapters were built for linux/amd64 under
   emulation and answered an interrogation there (2026-11-11); the self-tests
   ran on linux/arm64 only.
+
+### Generic services and disturbance data (contract 2.3)
+
+Run locally on 2026-11-11 (linux/arm64, `:dev` images of branch
+feat/iec103-generic-disturbance). In this harness only vitusdong has a
+server, and it declares `genericServices` and `disturbanceList` but not
+`disturbanceDataServer` (it cannot serve the fixture's tags and values):
+
+| Scenario | vitusdong → vitusdong | goiecp5, ariec103, open103 → vitusdong |
+|----------|-----------------------|----------------------------------------|
+| case.generic-read-1-3, -1-4-description, -not-existing; case.generic-write-1-3, -read-only; values.generic-read, values.generic-write | pass | unsupported (no generic services) |
+| case.disturbance-list, values.disturbance-list | pass | unsupported (no `disturbance-list`) |
+| case.disturbance-transfer, values.disturbance-transfer, values.disturbance-values | unsupported (server) | unsupported (server; open103 has the client) |
+
+vitusdong against itself is self-interoperability, not evidence: both of its
+sides share the deviations below. The independent evidence of contract 2.3 is
+the consumer run of go-iec60870-5 (`iec103/interop`, 2026-11-11, the same
+images): Open103's control system transferred the fixture's disturbance from
+that library's protection equipment, and vitusdong's control system and
+protection equipment met that library's. What it saw on the wire is in
+`tests/iec103/known-bugs-consumer.tsv` (an entry there cannot reproduce in
+this harness, so `scripts/interop.sh` does not read it):
+
+| Known bug | Wire evidence (consumer run) |
+|-----------|------------------------------|
+| vitusdong-generic-command-inf (client) | `15 81 2A 01 FE 00 01 01 01 03 01`: ASDU 21, cause 42, FUN 254, INF 0, RII 1, NOG 1, GIN 1.3, KOD 1; `0A 81 28 01 FE 00 01 01 01 03 01 03 02 01 C2 01`: ASDU 10, cause 40, INF 0. Table 18: 244 and 250 |
+| vitusdong-generic-answer-inf (server) | `0A 81 2A 01 FE 00 01 01 01 01 01 03 02 01 E8 03` (answer to INF 244) and `0A 81 28 01 FE 00 01 01 01 02 01 16 01 01 00` (answer to INF 250: a GRC data set where figure 17 has NO 0) |
+| vitusdong-disturbance-list-asdu23 (server) | `17 81 1F 01 FF 00 07 00 80 0C 00 1E 0F 09 0A 1A`: VSQ 81, FUN 255 (the order had 160), SOF 80 for TP |
+| vitusdong-sof-bits (client) | the station's `17 01 1F 01 A0 00 07 00 01 0C 00 1E 0F A9 0A 1A` (SOF 01: TP) reported as `tp: false` |
+| vitusdong-disturbance-procedure (client) | `18 81 1F 01 FF 00 01 01 07 00 00` (TOO 1), ASDU 26, then `19 81 1F 01 FF 00 40 01 07 00 00` (ASDU 25 TOO 64) and `18 ... 02 01 07 00 00` (TOO 2); the station ends the transfer at TOO 64 and answers TOO 2 with `1F 81 1F 01 FF 00 22 01 07 00 00` (TOO 34); the client waits for ASDU 27 and fails |
+| open103-asdu30-nfe (client) | the whole procedure ran (TOO 1, 2, 16, ASDU 25 TOO 68, TOO 8 and TOO 66 for ACC 1 and 2, TOO 64); the description, the four tags with their positions and the ratings of both channels arrived as in the fixture, but only values 0..24 of channel 1 are where they belong (25..39 and all of channel 2 stored at a wrong index: NFE read through an unpacked struct) |
+
+Not shown: a generic read of headings, a group or a directory (INF 240, 241,
+243), the general interrogation of generic data, writes with confirmation
+or abort, aborts of a disturbance transfer, more than one record. No harness
+server serves the fixture's disturbance values, so `disturbance-transfer`
+has no pairing inside the harness.
 
 ### Other deviations seen on the wire
 

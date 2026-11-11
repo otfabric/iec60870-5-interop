@@ -318,6 +318,22 @@ public sealed class Fixture103
     public List<Measurand> Measurands { get; } = [];
     public HashSet<(int Fun, int Inf)> Commands { get; } = [];
 
+    /// <summary>A generic entry (contract 2.3): GIN, description, GDD type and size, value, writable.</summary>
+    /// <param name="Value">A string (type 1), a long (types 3, 4) or a double (type 7).</param>
+    public sealed record GenericEntry(int Group, int Entry, string Description, int Type, int Size, object Value, bool Writable);
+
+    public sealed record Tag(int Pos, int Fun, int Inf, int Dpi);
+
+    public sealed record Channel(int Acc, double Rpv, double Rsv, double Rfa, List<short> Values);
+
+    /// <param name="Time">The time of the fault (ASDU 23), UTC.</param>
+    /// <param name="Start">The time of the first value (ASDU 26): milliseconds of the day.</param>
+    public sealed record Disturbance(int Fan, bool Tp, bool Tm, bool Test, bool Otev, DateTime Time, int Nof, int Interval,
+        int Start, List<Tag> Tags, List<Channel> Channels);
+
+    public List<GenericEntry> Generic { get; } = [];
+    public List<Disturbance> Disturbances { get; } = [];
+
     public static Fixture103 Load(string path)
     {
         JsonElement root;
@@ -407,6 +423,48 @@ public sealed class Fixture103
                     {
                         throw new FixtureException($"command {key.Item1}/{key.Item2}: duplicate");
                     }
+                }
+            }
+
+            if (root.TryGetProperty("generic", out var gs))
+            {
+                foreach (var g in gs.EnumerateArray())
+                {
+                    var gin = g.GetProperty("gin");
+                    var type = g.GetProperty("type").GetInt32();
+                    var v = g.GetProperty("value");
+                    object value = type switch
+                    {
+                        1 => v.GetString() ?? "",
+                        3 or 4 => v.GetInt64(),
+                        7 => v.GetDouble(),
+                        _ => throw new FixtureException($"generic entry: data type {type} is not 1, 3, 4 or 7"),
+                    };
+                    fx.Generic.Add(new GenericEntry(Octet(gin.GetProperty("group"), 255, "gin.group"), Octet(gin.GetProperty("entry"), 255, "gin.entry"),
+                        g.GetProperty("description").GetString() ?? "", type, Octet(g.GetProperty("size"), 32, "size"), value,
+                        g.TryGetProperty("writable", out var w) && w.GetBoolean()));
+                }
+            }
+
+            if (root.TryGetProperty("disturbances", out var ds))
+            {
+                foreach (var d in ds.EnumerateArray())
+                {
+                    bool Sof(string bit) => d.TryGetProperty("sof", out var s) && s.TryGetProperty(bit, out var b) && b.GetBoolean();
+                    var start = d.GetProperty("start").GetString() ?? "";
+                    if (!TimeSpan.TryParseExact(start, @"hh\:mm\:ss\.fff", CultureInfo.InvariantCulture, out var startSpan))
+                    {
+                        throw new FixtureException($"disturbance start '{start}' is not HH:MM:SS.mmm");
+                    }
+
+                    fx.Disturbances.Add(new Disturbance(d.GetProperty("fan").GetInt32(), Sof("tp"), Sof("tm"), Sof("test"), Sof("otev"),
+                        AsduDoc.ParseTime(d.GetProperty("time").GetString()), d.GetProperty("nof").GetInt32(), d.GetProperty("interval").GetInt32(),
+                        (int)startSpan.TotalMilliseconds,
+                        d.GetProperty("tags").EnumerateArray().Select(t => new Tag(t.GetProperty("pos").GetInt32(), Octet(t.GetProperty("fun"), 254, "fun"),
+                            Octet(t.GetProperty("inf"), 255, "inf"), Octet(t.GetProperty("dpi"), 3, "dpi"))).ToList(),
+                        d.GetProperty("channels").EnumerateArray().Select(c => new Channel(Octet(c.GetProperty("acc"), 255, "acc"),
+                            c.GetProperty("rpv").GetDouble(), c.GetProperty("rsv").GetDouble(), c.GetProperty("rfa").GetDouble(),
+                            c.GetProperty("values").EnumerateArray().Select(x => (short)x.GetInt32()).ToList())).ToList()));
                 }
             }
 
