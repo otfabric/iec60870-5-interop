@@ -163,8 +163,8 @@ in this table.
 
 A capability is a property of the adapter and of the upstream version in the
 image. The self-tests read it from the image and skip what a pairing lacks
-(the `needs` column of [tests/cases.tsv](../tests/cases.tsv) and
-[tests/feature-cases.tsv](../tests/feature-cases.tsv)), so "no" here
+(the `needs` column of [tests/iec104/cases.tsv](../tests/iec104/cases.tsv), [tests/iec101/cases.tsv](../tests/iec101/cases.tsv) and
+[tests/iec104/feature-cases.tsv](../tests/iec104/feature-cases.tsv)), so "no" here
 means "not tested", never "tested and failing".
 
 ## Features of the IEC 101 images
