@@ -20,7 +20,7 @@ section per version, newest first, each ending with a `---` line.
 
 ## v0.3.0
 
-**Date:** not released (prepared 2026-11-11)
+**Date:** 2026-11-11
 **Previous release:** v0.2.1
 
 ### Added
