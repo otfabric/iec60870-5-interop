@@ -137,7 +137,7 @@ then ok "connect failure: exit 3 and a result document"; else fail "connect fail
 # ---- server: readiness, events, operations, clean stop ----
 name=$(start_server "${ADAPTER}")
 if wait_ready "${name}"; then ok "server becomes ready"; else fail "server did not become ready"; finish; exit 1; fi
-first=$(docker logs "${name}" 2>/dev/null | head -1)
+first=$(first_event "${name}")
 if jq -e --arg a "${ADAPTER}" '.event == "ready" and .adapter == $a and .fixture == "baseline"
         and .commonAddress == 1 and (.address | type == "string")' <<<"${first}" >/dev/null 2>&1
 then ok "ready event"; else fail "first stdout line is not the ready event: ${first}"; fi
@@ -189,7 +189,7 @@ if jq -e '.features.secureAuthentication == true' <<<"${caps}" >/dev/null 2>&1; 
         name=$(start_server "${ADAPTER}" --secure --security-cert /secrets/station.pem \
             --security-key /secrets/station.key --security-trust /secrets/ca.pem)
         if wait_ready "${name}"; then ok "secure server becomes ready"; else fail "secure server did not become ready"; fi
-        first=$(docker logs "${name}" 2>/dev/null | head -1)
+        first=$(first_event "${name}")
         if jq -e '.event == "ready" and .secure == true' <<<"${first}" >/dev/null 2>&1
         then ok "ready event of a secure server"; else fail "ready event without secure: ${first}"; fi
         stop_server "${name}"
@@ -214,7 +214,7 @@ if jq -e '.features.tlsServer == true or .features.tlsClient == true' <<<"${caps
             name=$(start_server "${ADAPTER}" --tls --tls-cert /secrets/station.pem \
                 --tls-key /secrets/station.key --tls-trust /secrets/ca.pem)
             if wait_ready "${name}"; then ok "TLS server becomes ready"; else fail "TLS server did not become ready"; fi
-            first=$(docker logs "${name}" 2>/dev/null | head -1)
+            first=$(first_event "${name}")
             if jq -e '.event == "ready" and .tls == true' <<<"${first}" >/dev/null 2>&1
             then ok "ready event of a TLS server"; else fail "ready event without tls: ${first}"; fi
             stop_server "${name}"
@@ -240,7 +240,7 @@ then ok "tls is tlsServer and tlsClient"; else fail "tls does not agree with tls
 if jq -e '.features.redundancyServer == true' <<<"${caps}" >/dev/null 2>&1; then
     name=$(start_server "${ADAPTER}" --redundancy-group)
     if wait_ready "${name}"; then ok "server with a redundancy group becomes ready"; else fail "server with a redundancy group did not become ready"; fi
-    first=$(docker logs "${name}" 2>/dev/null | head -1)
+    first=$(first_event "${name}")
     if jq -e '.event == "ready" and .redundancyGroup == true' <<<"${first}" >/dev/null 2>&1
     then ok "ready event of a redundancy group"; else fail "ready event without redundancyGroup: ${first}"; fi
     stop_server "${name}"

@@ -55,7 +55,7 @@ then ok "connect failure: exit 3 and a result document"; else fail "connect fail
 # ---- server: readiness, events, operations, clean stop ----
 name=$(start_server "${ADAPTER}")
 if wait_ready "${name}"; then ok "server becomes ready"; else fail "server did not become ready"; finish; exit 1; fi
-first=$(docker logs "${name}" 2>/dev/null | head -1)
+first=$(first_event "${name}")
 if jq -e --arg a "${ADAPTER}" --arg s "iec60870-5-${STANDARD#iec}" --arg m "${LINK_MODE}" '
         .event == "ready" and .adapter == $a and .fixture == "baseline" and .commonAddress == 1
         and (.address | type == "string") and .standard == $s and .mode == $m and .linkAddress == 1' <<<"${first}" >/dev/null 2>&1

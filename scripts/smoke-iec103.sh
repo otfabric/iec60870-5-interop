@@ -85,7 +85,7 @@ role client || client_adapter="${SMOKE_CLIENT:-goiecp5}"
 name=$(start_server "${server_adapter}")
 if wait_ready "${name}"; then ok "server ${server_adapter} becomes ready"; else fail "server ${server_adapter} did not become ready"; finish; exit 1; fi
 if role server; then
-    first=$(docker logs "${name}" 2>/dev/null | head -1)
+    first=$(first_event "${name}")
     if jq -e --arg a "${ADAPTER}" '.event == "ready" and .adapter == $a and .fixture == "baseline" and .commonAddress == 1
             and (.address | type == "string") and .standard == "iec60870-5-103" and .mode == "unbalanced" and .linkAddress == 1' <<<"${first}" >/dev/null 2>&1
     then ok "ready event"; else fail "first stdout line is not the ready event: ${first}"; fi

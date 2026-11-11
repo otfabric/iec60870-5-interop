@@ -95,6 +95,21 @@ start_server() {
 
 # wait_ready <container>: the ready file exists only once the fixture is loaded
 # and the listener is up. No fixed delays.
+# first_event <container>: the first stdout line of a server, waiting up to
+# 5 s for it. The readiness file may appear before the ready event is
+# flushed to stdout (the contract does not order the two), so a server that
+# is ready can still have an empty log for a moment.
+first_event() {
+    local name="$1" line="" tries=0
+    while (( tries < 50 )); do
+        tries=$((tries + 1))
+        line=$(docker logs "${name}" 2>/dev/null | head -1)
+        [[ -n "${line}" ]] && break
+        sleep 0.1
+    done
+    printf '%s' "${line}"
+}
+
 wait_ready() {
     local name="$1" waited=0 state
     while true; do
