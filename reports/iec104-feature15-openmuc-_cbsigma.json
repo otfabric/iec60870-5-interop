@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","adapter":"openmuc","operation":"counter-interrogate","ok":false,"error":{"code":"tls-failed","message":"no TLS session with the station: java.net.SocketException: Connection or outbound has closed"},"connected":true,"startdtConfirmed":false,"tls":false,"confirmations":[],"terminated":false,"asdus":[],"elapsedMs":50}

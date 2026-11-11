@@ -1,0 +1,7 @@
+The adapter programs in this directory (adapters/<standard>/<stack>/) link
+GPL-3.0 libraries (lib60870-C, j60870) or are distributed together with them,
+and are licensed under the GNU General Public License, version 3 or (at your
+option) any later version. See ../licenses/GPL-3.0.txt and
+../THIRD_PARTY_NOTICES.md.
+
+    SPDX-License-Identifier: GPL-3.0-or-later

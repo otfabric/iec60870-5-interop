@@ -1,0 +1,1 @@
+{"adapter":"wendy512","asdus":[],"confirmations":[],"connected":true,"elapsedMs":7,"error":{"code":"tls-failed","message":"no STARTDT con over the TLS session"},"ok":false,"operation":"counter-interrogate","schemaVersion":"1.0","startdtConfirmed":false,"terminated":false,"tls":false}

@@ -1,0 +1,201 @@
+# Capabilities
+
+`print-capabilities` tells a consumer what an adapter image can do, so that a
+test suite can skip what a stack does not support instead of failing on it.
+
+A capability is declared `true` only when the self-tests of this repository
+exercise it for that adapter. An upstream library having an API for something
+is not enough.
+
+## Document
+
+One JSON object on one line ([schema](../schemas/capabilities.schema.json)):
+
+```json
+{
+  "schemaVersion": "1.0",
+  "adapter": "lib60870",
+  "adapterVersion": "v0.1.0",
+  "protocol": "iec60870-5-104",
+  "standard": "iec60870-5-104",
+  "upstream": {
+    "name": "lib60870-C",
+    "version": "v2.4.1",
+    "revision": "7a388e3e133999e1ca77ba7521d55d074b7cd2bc",
+    "license": "GPL-3.0",
+    "language": "C",
+    "independentEngine": true
+  },
+  "roles": { "server": true, "client": true },
+  "features": { "generalInterrogation": true, "...": false },
+  "pointTypes": ["M_SP_NA_1", "..."],
+  "commandTypes": ["C_SC_NA_1", "..."],
+  "clientOperations": ["connect", "..."]
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `adapter` | Stack name; the image is `iec60870-5-interop-<standard>-<adapter>` |
+| `protocol`, `standard` | The standard: `iec60870-5-101`, `-102`, `-103` or `-104` (`protocol` is the name of contract 1.x and has the same value) |
+| `transport`, `linkModes` | IEC 101/102/103 only: `tcp-stream`, and the link modes the self-tests exercise |
+| `adapterVersion` | Release of this repository the image was built from (`dev` for a local build) |
+| `upstream` | The implementation inside: name, exact version and revision, licence, language |
+| `upstream.engine` | Optional: the protocol engine (`name`, `version`, `license`) when the upstream is a layer over another project, as wendy512/iec104 is over go-iecp5 |
+| `upstream.independentEngine` | `false` when the adapter wraps the protocol engine of another adapter, or is OT Fabric's own stack (`own/`). Results from such an adapter do not count as an additional independent implementation |
+| `roles` | Which of `server` and `client` the image provides |
+| `features` | See below; every value is a boolean |
+| `pointTypes` | Point types a fixture may use with this adapter |
+| `commandTypes` | Command types a fixture may use; the CP56Time2a variant of each is accepted too when `timeTaggedCommands` is true |
+| `clientOperations` | Operations of `client` |
+
+## Features of the IEC 104 images
+
+| Feature | Meaning | lib60870 | openmuc | wendy512 | cbsigma | part5 |
+|---------|---------|:--------:|:-------:|:--------:|:-------:|:-----:|
+| `generalInterrogation` | Station interrogation (QOI 20), both roles | yes | yes | yes | yes | yes |
+| `groupInterrogation` | Interrogation groups 1..16 (QOI 21..36): a station answers the groups of its fixture and refuses the others | yes | yes | yes | yes | yes |
+| `counterInterrogation` | General counter request, read | yes | yes | yes | yes | yes |
+| `read` | Read command, including the refusal of an unknown address | yes | yes | yes | yes | yes |
+| `clockSync` | Clock synchronization command | yes | yes | yes | yes | yes |
+| `testCommand` | Test command with time tag (C_TS_TA_1) | yes | yes | yes | yes | yes |
+| `directCommands` | Execute without select | yes | yes | yes | yes | yes |
+| `selectBeforeOperate` | Select, execute, and `selectRequired` objects | yes | yes | yes | yes | yes |
+| `commandDeactivation` | Cancelling a selection (cause 8) | yes | yes | yes | yes | yes |
+| `timeTaggedCommands` | The CP56Time2a command types, as station and as controlling station | yes | yes | no ² | yes | yes ¹⁰ |
+| `spontaneousOnCommand` | The time-tagged report after an executed command | yes | yes | yes | yes | yes |
+| `apciParameters` | The `--k --w --t0..--t3` flags | yes | yes ¹ | yes ¹ | yes ¹ | yes ¹ |
+| `multipleConnections` | Independent simultaneous sessions | yes | yes | yes | yes | yes |
+| `pointQualityOnBitstring` | A quality descriptor other than good on `M_BO_NA_1` | yes | yes | yes | yes | yes |
+| `tls` | IEC 62351-3 transport security in both roles: `tlsServer` and `tlsClient` | yes | yes | no ³ | yes | no ¹¹ |
+| `tlsServer` | The [TLS flags](CONTAINER_CONTRACT.md#transport-security-flags) on `server` | yes | yes | no ³ | yes | no ¹¹ |
+| `tlsClient` | The TLS flags on `client` | yes | yes | yes | yes | no ¹¹ |
+| `dataTransferEvents` | The server events `data-transfer-started` and `data-transfer-stopped` | yes | yes | no ⁴ | yes ⁵ | yes ¹² |
+| `fileTransfer` | The file transfer types 120..125 in ASDU documents | yes | yes | no ⁶ | yes | no ¹³ |
+| `fileServer` | The station serves the `files` of a fixture | yes | yes ⁷ | yes ⁷ | yes | no ¹³ |
+| `fileClient` | The `file-get` operation | yes | yes ⁷ | no ⁶ | yes | no ¹³ |
+| `fileUploadServer` | The station takes the `uploads` of a fixture | yes | yes ⁷ | no ⁶ | yes | no ¹³ |
+| `fileUploadClient` | The `file-put` operation | yes | yes ⁷ | yes ⁷ | yes | no ¹³ |
+| `fileDirectoryServer` | The station answers a directory call with F_DR_TA_1 | yes | yes ⁷ | yes ⁷ | yes | no ¹³ |
+| `fileDirectoryClient` | The `file-dir` operation | yes | yes ⁷ | yes ⁷ | yes | no ¹³ |
+| `redundancyServer` | `server --redundancy-group`: one group of connections, one started | yes | yes | no ⁸ | yes | no ¹⁴ |
+| `redundancyClient` | The `redundancy` operation | yes | yes | yes | yes | no ¹⁴ |
+| `secureAuthentication` | The [security flags](CONTAINER_CONTRACT.md#security-flags): the A-Profile of IEC 62351-5, as station and as controlling station | no | no | no | yes ⁹ | no |
+
+¹ j60870 cannot switch the idle test off and requires `t3 >= t1`; go-iecp5
+requires every timer between 1 and 255 seconds; cB-Sigma/iec60870 takes a
+timer of 0 for its default, so it cannot switch the idle test off either, and
+neither can pascaldekloe/part5, which also takes 0 for its default
+(`session/config.go`) and panics on t0, t1 or t2 beyond 255 seconds.
+`--t3 0` is a usage error for these four adapters.
+
+² go-iecp5 v1.2.6 encodes C_SC_TA_1 .. C_SE_TC_1 but has no length for them, so it
+drops them on reception: a station never sees the command and a controlling
+station never sees its confirmation.
+
+³ go-iecp5 v1.2.6 has no station over TLS. `cs104/server.go:71` calls
+`net.Listen("tcp", ...)`; the `TLSConfig` field (`server.go:28`) is never read.
+`SrvSession` has unexported fields and an unexported `run`
+(`server_session.go:27-58`, `:157`), so an adapter cannot hand it a TLS
+connection, and `NewServerSpecial` dials out instead of listening
+(`server_special.go:100`). wendy512/iec104 v1.0.4 (`server/core.go`) adds nothing.
+Its client does TLS (`ClientOption.SetTLSConfig`), so `tlsClient` is true.
+
+⁴ go-iecp5 v1.2.6 answers STARTDT and STOPDT without telling the application
+(`cs104/server_session.go:303-311`).
+
+⁵ cB-Sigma/iec60870 tells the application when STARTDT is confirmed, but
+not when STOPDT is: the adapter watches the state of the link and emits
+`data-transfer-stopped` when it changes.
+
+⁶ go-iecp5 v1.2.6 cannot receive F_SG_NA_1: `asdu/identifier.go:167-233` has no
+entry for it, `fixInfoObjSize` in `asdu/asdu.go` fails in `UnmarshalBinary`, and
+the ASDU is dropped (`cs104/client.go:433`, `cs104/server_session.go:341`). So
+a controlling station cannot download and a station cannot take an upload.
+What it needs to receive for the other direction it can, which is why those
+are true.
+
+⁷ The upstream has the information elements but no procedure: j60870 1.8.0 and
+go-iecp5 v1.2.6 leave it to the application, so the adapter runs it
+(`FileStation.java`, `files.go`). j60870's own `sendDirectory` cannot be used:
+it sends cause 13 (`Connection.java:1541`) and writes the elements of
+`ASdu.java:533-543`, so the adapter builds the F_DR_TA_1 itself.
+
+⁸ go-iecp5 v1.2.6 keeps the started state in a local variable of `run()`
+(`cs104/server_session.go:170`, `:305`, `:311`) with no callback and queues in
+`Send()` regardless (`:531`), so a group of connections cannot follow which is
+started. The client only needs STARTDT and STOPDT on two connections, so
+`redundancyClient` is true.
+
+⁹ The adapter is the only one with the A-Profile, so the secure cases of the
+self-tests run cB-Sigma against itself; their value is for consumers that
+pair it with another implementation. The flags give a station one
+certificate and one set of trusted authorities and pins, so the association
+is authenticated with certificates only.
+
+¹⁰ pascaldekloe/part5 v0.3.0 is a toolkit: it has a session engine for either
+side of a connection (`session.TCP`), the information element types and a
+decoder of the monitor direction (`MonitorDataUnit`), but no station
+application and no decoder of the control direction. The adapter's station
+answers the fixture itself and reads every command, with or without time tag,
+with part5's element types (`info.CmdQual`, `info.SetPtQual`, `info.Norm`,
+`info.CP56Time2a`); the controlling station builds its commands with part5's
+`Command` builders and adds the time tag. The APCI, the ASDU header and the
+elements on the wire are part5's in both roles.
+
+¹¹ part5 v0.3.0 has no TLS. `session.TCP` takes any `net.Conn`, so the adapter
+could hand it a `crypto/tls` connection, but that would test Go's TLS, not
+part5.
+
+¹² part5 reports every level of a session on `Station.Level`: Down when it
+opens, Up on STARTDT, Down on STOPDT. It reports Down as well when a started
+session closes; the adapter emits `data-transfer-stopped` only when the
+session is still open after it.
+
+¹³ part5 v0.3.0 has the type identifications of file transfer
+(`info.F_FR_NA_1` ...) but no information elements or procedure for them.
+
+¹⁴ part5 v0.3.0 has no notion of a redundancy group, and its client side is
+one session per connection with no hook to run two.
+
+OT Fabric's own image (`own/go-iec104`, not a reference) declares every feature
+in this table.
+
+A capability is a property of the adapter and of the upstream version in the
+image. The self-tests read it from the image and skip what a pairing lacks
+(the `needs` column of [tests/cases.tsv](../tests/cases.tsv) and
+[tests/feature-cases.tsv](../tests/feature-cases.tsv)), so "no" here
+means "not tested", never "tested and failing".
+
+## Features of the IEC 101 images
+
+| Feature | Meaning | lib60870 | cbsigma |
+|---------|---------|:--------:|:-------:|
+| `unbalancedMode` | Unbalanced transmission: the client polls (class 2, class 1 on ACD) | yes | yes |
+| `balancedMode` | Balanced transmission: both stations are primaries | yes | yes |
+| `distinctBalancedAddresses` | Balanced, `--remote-link-address` other than `--link-address` | yes | no (cB-Sigma uses the controlled station's address in both directions; another value is a usage error) |
+| `generalInterrogation`, `groupInterrogation`, `counterInterrogation`, `read`, `clockSync` | As for IEC 104 | yes | yes |
+| `testCommand` | Test command C_TS_NA_1 (IEC 101 has no C_TS_TA_1) | yes | yes |
+| `directCommands`, `selectBeforeOperate`, `commandDeactivation`, `spontaneousOnCommand` | As for IEC 104 | yes | yes |
+| `pointQualityOnBitstring` | As for IEC 104 (the baseline fixture has no flag on M_BO_NA_1; not exercised for IEC 101 yet) | yes | yes |
+| `timeTaggedCommands` | IEC 101 has no CP56Time2a command types | no | no |
+| `apciParameters`, `multipleConnections`, `dataTransferEvents`, `tls`, `tlsServer`, `tlsClient`, `file*`, `redundancy*`, `secureAuthentication` | IEC 104 only | no | no |
+
+`pointTypes`: M_SP_NA_1, M_DP_NA_1, M_ST_NA_1, M_BO_NA_1, M_ME_NA_1,
+M_ME_NB_1, M_ME_NC_1, M_IT_NA_1. `commandTypes`: C_SC_NA_1, C_DC_NA_1,
+C_RC_NA_1, C_SE_NA_1, C_SE_NB_1, C_SE_NC_1. `clientOperations`: connect,
+interrogate, counter-interrogate, read, clock-sync, test-command, command,
+monitor.
+
+Observed, not a feature: a balanced lib60870 station (and station A)
+accepts frames carrying any link address; cB-Sigma's station ignores frames
+for another address. Both are permitted readings of a point-to-point
+balanced line; the smoke test therefore makes a link start-up fail with a
+link address field of another size, not with another address.
+
+## Rules for consumers
+
+- Read the capabilities from the image under test, not from this page.
+- Skip, do not fail, a scenario that needs a feature the adapter declares
+  `false`.
+- Count independent implementations by `upstream.independentEngine`.

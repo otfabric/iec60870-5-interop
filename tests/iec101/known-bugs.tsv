@@ -1,0 +1,3 @@
+# Known bugs of upstream versions for IEC 60870-5-101, for scripts/interop.sh.
+# Same columns and rules as tests/iec104/known-bugs.tsv. A bug is listed
+# only with evidence from a run (docs/COMPATIBILITY.md); none so far.

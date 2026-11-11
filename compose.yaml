@@ -1,0 +1,72 @@
+# Reference servers for local work. Ports are published on loopback only:
+# these are unauthenticated IEC 60870-5 stations and must not be reachable
+# from a plant network.
+#
+#   docker compose up -d --wait        # every server, waits for readiness
+#   docker compose down
+#
+# IEC60870_5_INTEROP_VERSION selects the image tag (default: dev, the local
+# build); IEC101_LINK_MODE the link mode of the IEC 101 stations (default
+# unbalanced). An IEC 101 station serves one TCP connection at a time.
+
+x-server: &server
+  healthcheck:
+    test: ["CMD", "test", "-f", "/run/iec60870-5-interop/ready"]
+    interval: 2s
+    timeout: 2s
+    retries: 15
+    start_period: 10s
+  stop_grace_period: 10s
+
+x-iec101: &iec101
+  <<: *server
+  command: ["server", "--link-mode", "${IEC101_LINK_MODE:-unbalanced}"]
+
+x-iec104: &iec104
+  <<: *server
+  command: ["server", "--fixture", "/fixtures/${IEC104_FIXTURE:-baseline}/fixture.json"]
+
+services:
+  # ---- IEC 60870-5-101 (FT 1.2 over TCP), host ports 2401.. ----
+  iec101-lib60870:
+    <<: *iec101
+    image: ghcr.io/otfabric/iec60870-5-interop-iec101-lib60870:${IEC60870_5_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:2401:2401"
+
+  iec101-cbsigma:
+    <<: *iec101
+    image: ghcr.io/otfabric/iec60870-5-interop-iec101-cbsigma:${IEC60870_5_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:2402:2401"
+
+  # ---- IEC 60870-5-104, host ports 2404.. ----
+  iec104-lib60870:
+    <<: *iec104
+    image: ghcr.io/otfabric/iec60870-5-interop-iec104-lib60870:${IEC60870_5_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:2404:2404"
+
+  iec104-openmuc:
+    <<: *iec104
+    image: ghcr.io/otfabric/iec60870-5-interop-iec104-openmuc:${IEC60870_5_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:2405:2404"
+
+  iec104-wendy512:
+    <<: *iec104
+    image: ghcr.io/otfabric/iec60870-5-interop-iec104-wendy512:${IEC60870_5_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:2406:2404"
+
+  iec104-cbsigma:
+    <<: *iec104
+    image: ghcr.io/otfabric/iec60870-5-interop-iec104-cbsigma:${IEC60870_5_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:2407:2404"
+
+  iec104-part5:
+    <<: *iec104
+    image: ghcr.io/otfabric/iec60870-5-interop-iec104-part5:${IEC60870_5_INTEROP_VERSION:-dev}
+    ports:
+      - "127.0.0.1:2408:2404"

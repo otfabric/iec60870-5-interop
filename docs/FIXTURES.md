@@ -1,0 +1,376 @@
+# Fixtures
+
+Fixtures live in `fixtures/<standard>/<name>/fixture.json`, one schema for all
+standards ([`fixtures/schema/iec60870-5-fixture.schema.json`](../fixtures/schema/iec60870-5-fixture.schema.json)).
+An image bakes in the fixtures of its standard at `/fixtures/<name>/fixture.json`.
+
+| Standard | Fixtures | Notes |
+|----------|----------|-------|
+| IEC 101 | `baseline` | The IEC 104 baseline without its files; every address fits a two-octet information object address (`--ioa-size 2`, the default); `scripts/validate-fixtures.py` enforces 65535 as the limit |
+| IEC 104 | `baseline`, `extended` | As in iec104-interop 0.6.0 |
+
+The station behaviour below is the same for IEC 101, except that IEC 101 has
+no CP56Time2a command types and no C_TS_TA_1 (the adapters are written to refuse them with cause 44; no self-test sends one), tests
+with C_TS_NA_1, and its broadcast common address is 255 with a one-octet
+common address field (65535 with two). File transfer, uploads, the directory
+and redundancy groups are not part of the IEC 101 images.
+
+A fixture describes a simulated IEC 60870-5-104 controlled station: its
+points, their initial values and the commands that act on them. It contains
+no assertions and no implementation detail. Every server adapter serves the
+same fixture the same way; this document says what "the same way" is.
+
+- Format: JSON, [schema](../fixtures/schema/iec60870-5-fixture.schema.json), `schemaVersion` `"1.0"`
+- Location: `fixtures/<name>/fixture.json`, baked into every image under `/fixtures`
+- Validation: `make validate` (schema plus the cross-field rules below); adapters apply the same rules at start and exit 4 on a violation
+
+## Format
+
+```json
+{
+  "schemaVersion": "1.0",
+  "name": "baseline",
+  "station": { "commonAddress": 1 },
+  "points": [
+    { "ioa": 100, "type": "M_SP_NA_1", "value": true },
+    { "ioa": 110, "type": "M_SP_NA_1", "value": false, "quality": ["NT", "IV"] },
+    { "ioa": 300, "type": "M_IT_NA_1", "value": 123456, "sequence": 1 }
+  ],
+  "commands": [
+    { "ioa": 500, "type": "C_SC_NA_1", "target": 100, "reportCause": 11 },
+    { "ioa": 510, "type": "C_SC_NA_1", "target": 100, "selectRequired": true }
+  ],
+  "files": [
+    { "ioa": 30000, "name": 1, "size": 1000, "sectionSize": 1000 }
+  ],
+  "uploads": [
+    { "ioa": 31000, "name": 1, "maxSize": 8192 }
+  ]
+}
+```
+
+### Points
+
+| Field | Meaning |
+|-------|---------|
+| `ioa` | Information object address, 1..16777215, unique |
+| `type` | The type without time tag: see the table |
+| `value` | Initial value |
+| `quality` | Optional array of flags; absent means good |
+| `transient` | `M_ST_NA_1` only |
+| `sequence` | `M_IT_NA_1` only, 0..31 |
+| `groups` | Optional array of interrogation groups, 1..16, unique. Not on `M_IT_NA_1`, which an interrogation does not report |
+
+| `type` | `value` | `quality` flags |
+|--------|---------|-----------------|
+| `M_SP_NA_1` | boolean | `BL` `SB` `NT` `IV` |
+| `M_DP_NA_1` | 0..3 | `BL` `SB` `NT` `IV` |
+| `M_ST_NA_1` | -64..63 | `OV` `BL` `SB` `NT` `IV` |
+| `M_BO_NA_1` | 0..4294967295 | `OV` `BL` `SB` `NT` `IV`, with the feature `pointQualityOnBitstring` |
+| `M_ME_NA_1` | raw NVA, -32768..32767 | `OV` `BL` `SB` `NT` `IV` |
+| `M_ME_NB_1` | -32768..32767 | `OV` `BL` `SB` `NT` `IV` |
+| `M_ME_NC_1` | number | `OV` `BL` `SB` `NT` `IV` |
+| `M_IT_NA_1` | 32-bit signed | `CY` `CA` `IV` |
+
+Use values a single-precision float represents exactly for `M_ME_NC_1`
+(230.5, not 230.1), so that every stack prints the same number.
+
+### Commands
+
+| Field | Meaning |
+|-------|---------|
+| `ioa` | Address of the command object; unique, and not the address of a point |
+| `type` | The type without time tag. The CP56Time2a variant is accepted for the same object |
+| `target` | Address of the point the command acts on; its type must match |
+| `reportCause` | Cause of transmission of the report after execution: 11 (return information, remote command; the default) or 3 (spontaneous) |
+| `selectRequired` | When true, an execute is refused unless the object is selected. Default false |
+
+| Command | Target | Effect of an execute |
+|---------|--------|----------------------|
+| `C_SC_NA_1` | `M_SP_NA_1` | value := command state |
+| `C_DC_NA_1` | `M_DP_NA_1` | value := command state (1 or 2) |
+| `C_RC_NA_1` | `M_ST_NA_1` | value := value - 1 (lower) or + 1 (higher) |
+| `C_SE_NA_1` | `M_ME_NA_1` | value := raw NVA |
+| `C_SE_NB_1` | `M_ME_NB_1` | value := scaled value |
+| `C_SE_NC_1` | `M_ME_NC_1` | value := float value |
+
+Quality flags of the target are not changed by a command.
+
+### Files
+
+Optional. Only a server with the feature `fileServer` serves them; every
+adapter validates them.
+
+| Field | Meaning |
+|-------|---------|
+| `ioa` | Information object address of the file, 1..16777215, unique among points, commands and files |
+| `name` | Name of file (NOF), 1..255 |
+| `size` | Length of the file in octets, 1..65536 |
+| `sectionSize` | Length of every section but the last, 1..`size` |
+
+The content is not stored: octet `i` of the file (counting from 0) is
+`(i + ioa) mod 251`. A consumer computes the expected content, or its
+SHA-256, from the fixture alone; 251 is prime, so no section or segment
+boundary lines up with the pattern.
+
+### Uploads
+
+Optional. Where a controlling station may send a file. Only a server with the
+feature `fileUploadServer` takes one; every adapter validates them.
+
+| Field | Meaning |
+|-------|---------|
+| `ioa` | Information object address of the file, 1..16777215, unique among points, commands, files and uploads |
+| `name` | Name of file (NOF), 1..255 |
+| `maxSize` | The longest file taken, in octets, 1..65536 |
+
+## Station behaviour
+
+`CA` is `station.commonAddress`. A request is *for the station* when its
+common address is `CA` or the broadcast address 65535. Answers always carry
+`CA`.
+
+### Refusals common to all requests
+
+| Condition | Answer |
+|-----------|--------|
+| Common address is neither `CA` nor 65535 | Mirror with cause 46 and P/N = 1 |
+| Type identification the station does not serve | Mirror with cause 44 and P/N = 1 |
+| Process command with a cause other than 6 or 8 | Mirror with cause 45 and P/N = 1 |
+| `server --secure --roles ...`: a request the roles do not permit | Mirror with cause 17 (not authorized) and P/N = 1 |
+
+The role check comes right after the type check, before the common address:
+which role permits what is IEC 62351-8's and the library's. Such a refusal,
+like the others in this table, produces no server event.
+
+What a station answers to a *system* command with an unexpected cause is left
+to the adapter's library and is not part of the fixture behaviour.
+
+### Interrogation (C_IC_NA_1)
+
+| Request | Answer |
+|---------|--------|
+| QOI 20 | Activation confirmation; every point that is not an integrated total, with cause 20; activation termination |
+| QOI 21..36, group `QOI - 20` has a point in `groups` | Activation confirmation; the points of that group, with cause `QOI`; activation termination. Only with the feature `groupInterrogation` |
+| Any other QOI | Negative activation confirmation |
+
+An adapter without `groupInterrogation` refuses a fixture with `groups` (exit 4).
+A fixture without `groups` has no group to serve, so every adapter refuses
+QOI 21..36 on it; the baseline fixture is such a fixture.
+
+Points are sent without time tag, in ascending address order. Consecutive
+points of the same type share an ASDU (SQ = 0); a change of type starts a new
+one. The baseline therefore yields nine data ASDUs, two of them with two
+objects.
+
+### Counter interrogation (C_CI_NA_1)
+
+| Request | Answer |
+|---------|--------|
+| QCC 5 (general request, read) | Activation confirmation; every integrated total with cause 37; activation termination |
+| Any other QCC | Negative activation confirmation |
+
+### Read (C_RD_NA_1, cause 5)
+
+| Request | Answer |
+|---------|--------|
+| Address of a point (integrated totals included) | The point with cause 5, without time tag |
+| Any other address | Mirror with cause 47 and P/N = 1 |
+
+### Clock synchronization (C_CS_NA_1) and test command (C_TS_TA_1)
+
+Positive activation confirmation. The station does not change its clock: time
+tags it generates are the current UTC time.
+
+### Process commands
+
+For a command of type `T` (with or without time tag) to address `A`, cause 6
+(activation) or 8 (deactivation):
+
+| Condition, first match wins | Answer | Effect |
+|-----------------------------|--------|--------|
+| No command object at `A`, or its type is not `T` | Mirror with cause 47 and P/N = 1 | none |
+| Cause 8 | Deactivation confirmation (cause 9) | selection cleared |
+| Value not permitted (`C_DC`/`C_RC` state 0 or 3) | Negative activation confirmation | none |
+| S/E = select | Activation confirmation | object selected |
+| S/E = execute, `selectRequired`, object not selected | Negative activation confirmation | none |
+| S/E = execute, step command at the limit (-64 or 63) | Negative activation confirmation | selection cleared |
+| S/E = execute | Activation confirmation, **report**, activation termination, in this order | target updated, selection cleared |
+
+The **report** is the target point with its CP56Time2a type (`M_SP_TB_1`,
+...), the current time, cause `reportCause` and originator 0. It is sent on
+the connection that issued the command, not to other connections.
+
+A selection has no timeout and is shared by all connections. The time tag of
+a time-tagged command is not evaluated.
+
+### File transfer (F_SC_NA_1, cause 13)
+
+Only with the feature `fileServer`. The procedure is the one of
+[`file-get`](CONTAINER_CONTRACT.md#file-get); every ASDU has cause 13.
+
+| Request | Answer |
+|---------|--------|
+| Select (SCQ 1) of a file address with its name | F_FR_NA_1 with the length of the file |
+| Select of an unknown address, or of a file with another name | Mirror with cause 47 and P/N = 1 |
+| Request file (SCQ 2) | F_SR_NA_1 for section 1 |
+| Request section (SCQ 6) | The section in F_SG_NA_1 segments, then F_LS_NA_1 with LSQ 3 and the checksum of the section |
+| Section acknowledged (AFQ 3) | F_SR_NA_1 for the next section, or after the last one F_LS_NA_1 with LSQ 1 and the checksum of the file |
+| File acknowledged (AFQ 1) | Nothing; the transfer is complete |
+| Deactivation (SCQ 3 or 7), of any file address and name | Nothing; a transfer of that file is abandoned |
+
+A file of `size` octets has `ceil(size / sectionSize)` sections, numbered
+from 1. The NOS of the last-section F_LS_NA_1 (LSQ 1) is left to the
+library: lib60870 sends one more than the number of sections,
+cB-Sigma/iec60870 the number of the last section. Clients accept either, and
+the self-tests do not compare that field. A segment carries at most 236 octets, so that the ASDU fits an APDU
+with three-octet addresses. A checksum is the sum of the octets modulo 256.
+
+A file is sent on the connection that selected it.
+
+### File upload (F_FR_NA_1, F_SR_NA_1, F_SG_NA_1, F_LS_NA_1, cause 13)
+
+Only with the feature `fileUploadServer`. The procedure is the one of
+[`file-put`](CONTAINER_CONTRACT.md#file-put); every ASDU has cause 13.
+
+| Request | Answer |
+|---------|--------|
+| File ready with the address and name of an entry of `uploads`, and a length of 1..`maxSize` | F_SC_NA_1 with SCQ 2 |
+| Any other file ready | Mirror with cause 47 and P/N = 1 |
+| Section ready of the file being received | F_SC_NA_1 with SCQ 6 and the same NOS |
+| F_SG_NA_1 of the section called | Nothing; the octets are kept |
+| F_LS_NA_1 with LSQ 3 | F_AF_NA_1 with the NOS and AFQ 3, or AFQ 4 when the checksum or the length of the section does not match |
+| F_LS_NA_1 with LSQ 1 | F_AF_NA_1 with AFQ 1, or AFQ 2 when the checksum or the length of the file does not match; the event `file-received` |
+
+The NOS of the F_LS_NA_1 with LSQ 1 is left to the client, and the F_AF_NA_1
+repeats it: go-iec104 sends one more than the number of sections,
+cB-Sigma/iec60870 the number of the last section, as with a download.
+
+A stored file stays for the life of the process, and a second upload to the same
+address replaces it. With the feature `fileServer` it can be fetched like a file
+of `files`, with its name, in sections of a size the station chooses. It is in
+the directory.
+
+### Directory (F_SC_NA_1, cause 5)
+
+Only with the feature `fileDirectoryServer`.
+
+| Request | Answer |
+|---------|--------|
+| SCQ 0 | F_DR_TA_1 with cause 5: an entry for every file of `files` and every stored upload, in ascending address order, the last one with the LFD bit (0x20) in SOF |
+
+An entry has the address of the file, NOF, LOF, SOF (status 0, the LFD bit where
+it applies) and a CP56Time2a time of the station's choosing, which a test must
+not compare. Whether entries with consecutive addresses travel as a sequence
+(SQ = 1) or as separate objects, and how many one ASDU holds, is left to the
+library. Files with consecutive addresses arrive in one ASDU; the agreement check
+of the self-tests does not compare SQ. What a station without any file answers is
+left to the library as well.
+
+### Redundancy group
+
+Only with `server --redundancy-group`, and so with the feature
+`redundancyServer`. All connections form one redundancy group in the sense of
+IEC 60870-5-104 clause 10:
+
+- At most one connection has data transfer started. A connection in STOPDT gets
+  no ASDU.
+- A STARTDT act on another connection is confirmed there, and from then on
+  nothing is sent on the connection that was started. Whether that one is also
+  closed is left to the stack: the lib60870, openmuc and cbsigma stations close
+  it, the otfabric station keeps it open. A test must not rely on either.
+  A connection already in STOPDT stays up either way.
+- **Event queue.** When a connection in STARTDT gets a STOPDT act, the station
+  queues one event: the point of type `M_SP_NA_1` with the lowest address, with
+  its current value and quality, without time tag, with cause 3 and originator 0.
+  It waits for the next connection to start, and goes out after that connection's
+  STARTDT con. A takeover queues nothing, and neither does a connection that
+  ends. This is the only thing a station sends unasked, and only in this mode.
+
+Answers still go to the connection that asked; the group changes nothing else.
+
+Without the flag there is no group and no queue: every connection is on its own.
+
+### What a station never does
+
+- Send anything unsolicited, apart from the event of a redundancy group: no
+  cyclic or background data, no end of initialization. Every other ASDU is the
+  answer to a request, which keeps tests free of timing assumptions.
+- Change state without a command. Restart the container to return to the
+  fixture.
+
+## The baseline fixture
+
+Station 1.
+
+| IOA | Type | Value | Quality |
+|----:|------|-------|---------|
+| 100 | `M_SP_NA_1` | true | |
+| 101 | `M_DP_NA_1` | 2 (on) | |
+| 102 | `M_ST_NA_1` | 5 | |
+| 103 | `M_BO_NA_1` | 2863311530 (0xAAAAAAAA) | |
+| 110 | `M_SP_NA_1` | false | NT, IV |
+| 111 | `M_SP_NA_1` | true | BL, SB |
+| 200 | `M_ME_NA_1` | 16384 (0.5) | |
+| 201 | `M_ME_NB_1` | 1234 | |
+| 202 | `M_ME_NC_1` | 230.5 | |
+| 210 | `M_ME_NB_1` | -32768 | OV |
+| 211 | `M_ME_NB_1` | -1 | |
+| 300 | `M_IT_NA_1` | 123456, sequence 1 | |
+
+| IOA | Command | Target | Report cause | Select required |
+|----:|---------|-------:|-------------:|-----------------|
+| 500 | `C_SC_NA_1` | 100 | 11 | no |
+| 501 | `C_DC_NA_1` | 101 | 3 | no |
+| 502 | `C_SE_NC_1` | 202 | 11 | no |
+| 503 | `C_SE_NA_1` | 200 | 11 | no |
+| 504 | `C_SE_NB_1` | 201 | 11 | no |
+| 505 | `C_RC_NA_1` | 102 | 11 | no |
+| 510 | `C_SC_NA_1` | 100 | 11 | yes |
+
+| IOA | File name | Size | Section size | Sections | SHA-256 |
+|----:|----------:|-----:|-------------:|---------:|---------|
+| 30000 | 1 | 1000 | 1000 | 1 | `85e6f8dae1836546d45697e6d939234bc7fe5f31862f863af71e52bc223adbde` |
+| 30001 | 1 | 5000 | 2048 | 3 | `149c48d73a2f7159a1ad298d2ca582fa1773635c6ed071a8b25fc46e915f01c8` |
+
+## The extended fixture
+
+Station 1. What the baseline does not have and old images do not know: read it
+from the image with `print-fixture extended`, after checking the features it
+needs (`pointQualityOnBitstring`, `groupInterrogation`; `files` and `uploads` are
+ignored by a station that does not serve them). Its station serves the requests of this document like the baseline's.
+
+| IOA | Type | Value | Quality | Groups |
+|----:|------|-------|---------|--------|
+| 100 | `M_SP_NA_1` | true | | 1 |
+| 101 | `M_DP_NA_1` | 2 (on) | | 1 |
+| 103 | `M_BO_NA_1` | 2863311530 (0xAAAAAAAA) | | 2 |
+| 104 | `M_BO_NA_1` | 1431655765 (0x55555555) | OV, IV | 2 |
+| 105 | `M_BO_NA_1` | 4042322160 (0xF0F0F0F0) | BL, SB, NT | 2, 3 |
+| 200 | `M_ME_NB_1` | 1234 | | 3, 16 |
+| 202 | `M_ME_NC_1` | 230.5 | | |
+| 300 | `M_IT_NA_1` | 123456, sequence 1 | | |
+
+| IOA | Command | Target |
+|----:|---------|-------:|
+| 500 | `C_SC_NA_1` | 100 |
+
+| IOA | File name | Size | Section size | Sections | SHA-256 |
+|----:|----------:|-----:|-------------:|---------:|---------|
+| 30000 | 1 | 1000 | 1000 | 1 | `85e6f8dae1836546d45697e6d939234bc7fe5f31862f863af71e52bc223adbde` |
+| 30001 | 2 | 5000 | 2048 | 3 | `149c48d73a2f7159a1ad298d2ca582fa1773635c6ed071a8b25fc46e915f01c8` |
+
+| IOA | Upload name | Largest file |
+|----:|------------:|-------------:|
+| 31000 | 1 | 8192 |
+
+## Adding a fixture
+
+1. Create `fixtures/<name>/fixture.json`; `name` must equal the directory.
+2. `make validate`.
+3. Use only types and features every published adapter declares
+   ([CAPABILITIES.md](CAPABILITIES.md)), or say in this document which features
+   the fixture needs; a fixture must not need adapter-specific behaviour.
+4. Rebuild the images (`make images`): fixtures are baked in.
+5. If the fixture is meant for the self-tests, add cases for it; a fixture
+   nothing exercises is not verified.

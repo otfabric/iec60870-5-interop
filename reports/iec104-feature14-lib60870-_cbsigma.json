@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","adapter":"lib60870","operation":"counter-interrogate","ok":false,"error":{"code":"tls-failed","message":"the TLS handshake failed"},"connected":true,"startdtConfirmed":false,"confirmations":[],"terminated":false,"tls":false,"asdus":[],"elapsedMs":15}

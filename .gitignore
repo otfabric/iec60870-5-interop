@@ -1,0 +1,21 @@
+# Local build artifacts
+adapters/*/lib60870/build/
+adapters/iec104/openmuc/target/
+adapters/*/*/iec60870-5-interop
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+
+# Build artefacts live in /bin/ and /release/ (otfabric/engineering REPO-005)
+/bin/
+/release/
+*.test
+coverage.out
+
+# Output of a bare `go build`, anchored so it can never hide a source folder
+/adapters/iec101/cbsigma/cbsigma
+/adapters/iec104/cbsigma/cbsigma
+/adapters/iec104/wendy512/wendy512
+/adapters/iec104/part5/part5
