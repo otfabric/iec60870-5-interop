@@ -50,6 +50,7 @@ One JSON object on one line ([schema](../schemas/capabilities.schema.json)):
 | `clientOperations` | Operations of `client` |
 | `asduTypes` | IEC 102 and 103: the type identifications the image decodes (`monitor`) and sends (`control`) |
 | `linkAddressSizes`, `caSizes`, `profiles` | IEC 102: the link address and common address sizes and the profiles (`standard`, `ree`) the image supports ([contract](CONTAINER_CONTRACT.md#iec-102-capabilities)) |
+| `linkAddressSizes`, `cotSizes`, `caSizes`, `ioaSizes` | IEC 101 (contract 2.3): the field sizes the image takes; another is a usage error ([contract](CONTAINER_CONTRACT.md#field-sizes)) |
 
 ## Features of the IEC 104 images
 
@@ -171,17 +172,35 @@ means "not tested", never "tested and failing".
 
 ## Features of the IEC 101 images
 
-| Feature | Meaning | lib60870 | cbsigma |
-|---------|---------|:--------:|:-------:|
-| `unbalancedMode` | Unbalanced transmission: the client polls (class 2, class 1 on ACD) | yes | yes |
-| `balancedMode` | Balanced transmission: both stations are primaries | yes | yes |
-| `distinctBalancedAddresses` | Balanced, `--remote-link-address` other than `--link-address` | yes | no (cB-Sigma uses the controlled station's address in both directions; another value is a usage error) |
-| `generalInterrogation`, `groupInterrogation`, `counterInterrogation`, `read`, `clockSync` | As for IEC 104 | yes | yes |
-| `testCommand` | Test command C_TS_NA_1 (IEC 101 has no C_TS_TA_1) | yes | yes |
-| `directCommands`, `selectBeforeOperate`, `commandDeactivation`, `spontaneousOnCommand` | As for IEC 104 | yes | yes |
-| `pointQualityOnBitstring` | As for IEC 104 (the baseline fixture has no flag on M_BO_NA_1; not exercised for IEC 101 yet) | yes | yes |
-| `timeTaggedCommands` | IEC 101 has no CP56Time2a command types | no | no |
-| `apciParameters`, `multipleConnections`, `dataTransferEvents`, `tls`, `tlsServer`, `tlsClient`, `file*`, `redundancy*`, `secureAuthentication` | IEC 104 only | no | no |
+| Feature | Meaning | lib60870 | cbsigma | digitalpetri |
+|---------|---------|:--------:|:-------:|:------------:|
+| `unbalancedMode` | Unbalanced transmission: the client polls (class 2, class 1 on ACD) | yes | yes | yes |
+| `balancedMode` | Balanced transmission: both stations are primaries | yes | yes | yes |
+| `distinctBalancedAddresses` | Balanced, `--remote-link-address` other than `--link-address` | yes | no (cB-Sigma uses the controlled station's address in both directions; another value is a usage error) | no (digitalpetri puts the station's own address in every frame it sends and ignores the address of what it receives; another value is a usage error) |
+| `unbalancedCommonAddress` | Contract 2.3. Unbalanced client: a request may carry a common address other than `--link-address` | yes | yes | no (its master sends an ASDU to the station whose link address equals the common address, and one with the broadcast common address as SEND/NO REPLY to all stations; such a request is a usage error) |
+| `generalInterrogation`, `groupInterrogation`, `counterInterrogation`, `read`, `clockSync` | As for IEC 104 | yes | yes | yes |
+| `testCommand` | Test command C_TS_NA_1 (IEC 101 has no C_TS_TA_1) | yes | yes | yes |
+| `directCommands`, `selectBeforeOperate`, `commandDeactivation`, `spontaneousOnCommand` | As for IEC 104 | yes | yes | yes |
+| `pointQualityOnBitstring` | As for IEC 104 (the baseline fixture has no flag on M_BO_NA_1; not exercised for IEC 101 yet) | yes | yes | yes |
+| `timeTaggedCommands` | IEC 101 has no CP56Time2a command types | no | no | no |
+| `apciParameters`, `multipleConnections`, `dataTransferEvents`, `tls`, `tlsServer`, `tlsClient`, `file*`, `redundancy*`, `secureAuthentication` | IEC 104 only | no | no | no |
+
+Field sizes (contract 2.3), the same for all three images, each read from
+the library's source: `linkAddressSizes` `[0, 1, 2]` (0 in balanced mode
+only), `cotSizes` `[1, 2]`, `caSizes` `[1, 2]`, `ioaSizes` `[1, 2, 3]`.
+lib60870-C: `LinkLayerParameters.addressLength` and
+`CS101_AppLayerParameters` `sizeOfCOT`, `sizeOfCA`, `sizeOfIOA`; cB-Sigma:
+`cs101` `AddrSize` and `iec.Params`; digitalpetri: `LinkSettings.linkAddressLength`
+and `ProtocolProfile`. The cross-stack run exercises 2/2/2/3, 1/2/1/3,
+2/1/2/2 and 0/1/1/2 (balanced) in the order link address, cause, common
+address, object address; a one-octet object address needs another fixture.
+
+The digitalpetri station answers every request of the fixture in the
+library's raw-ASDU hook (`ServerHandler.onRawAsdu`): the library's own
+station model sends one object per interrogation ASDU, reports with cause 11
+only and refuses a deactivation with cause 45, none of which is the fixture's
+behaviour (FIXTURES.md). The FT 1.2 link, the ASDU codec and the TCP transport
+are the library's.
 
 `pointTypes`: M_SP_NA_1, M_DP_NA_1, M_ST_NA_1, M_BO_NA_1, M_ME_NA_1,
 M_ME_NB_1, M_ME_NC_1, M_IT_NA_1. `commandTypes`: C_SC_NA_1, C_DC_NA_1,
@@ -241,8 +260,9 @@ controlled station ([REFERENCE_STACKS.md](REFERENCE_STACKS.md)).
 
 All four are `linkModes` `["unbalanced"]`, `transport` `tcp-stream`, with
 `pointTypes` and `commandTypes` empty and `clientOperations` connect,
-interrogate, clock-sync, command, monitor. The IEC 101/104 features not in the
-table are false.
+interrogate, clock-sync, command, monitor, and (contract 2.3) the operations
+of the generic services and the disturbance data the table gives them. The
+IEC 101/104 features not in the table are false.
 
 | Feature | Meaning | vitusdong | goiecp5 | ariec103 | open103 |
 |---------|---------|:---------:|:-------:|:--------:|:-------:|
@@ -253,9 +273,12 @@ table are false.
 | `identification` | ASDU 5 after the reset of the communication unit | yes ⁶ | yes | yes | yes |
 | `measurands` | Server: the fixture's measurands as class 2 data. Client: ASDU 3 and 9 | no ⁷ | yes | yes | yes |
 | `broadcastClockSync` | `clock-sync --broadcast` (SEND/NO REPLY to 255) | no | no | no | no |
-| `genericServices`, `disturbanceData` | no operation in contract 2.1 | no | no | no | no |
-| `asduTypes.monitor` (decoded) | | 1, 5, 6, 8 | 1..6, 8, 9 | 1, 2, 5..9, 20, 23 | 1, 2, 4, 5, 9, 23, 26..31 |
-| `asduTypes.control` (sent) | | 6, 7, 20 | 6, 7, 20 | 6, 7, 20 | 6, 7, 20, 24, 25 |
+| `genericServices` | Client: `generic-read`, `generic-write`. Server: the fixture's generic entries | yes ⁸ | no ¹⁰ | no ¹¹ | no ¹² |
+| `disturbanceList` | Client: `disturbance-list`. Server: the fixture's ASDU 23 | yes ⁹ | no ¹⁰ | no ¹¹ | no ¹² |
+| `disturbanceData` | Client: `disturbance-transfer` | yes ⁹ | no ¹⁰ | no ¹¹ | yes ¹² |
+| `disturbanceDataServer` | Server: the fixture's records with tags and values | no ⁹ | - | - | - |
+| `asduTypes.monitor` (decoded) | | 1, 5, 6, 8, 10, 23, 26, 27, 29..31 | 1..6, 8, 9 | 1, 2, 5..9, 20, 23 | 1, 2, 4, 5, 9, 23, 26..31 |
+| `asduTypes.control` (sent) | | 6, 7, 10, 20, 21, 24, 25 | 6, 7, 20 | 6, 7, 20 | 6, 7, 20, 24, 25 |
 
 Every client decodes the ASDU documents itself from the octets its library
 hands it (contract: the standard's layout, `data` otherwise); `asduTypes`
@@ -283,6 +306,51 @@ says what the library knows.
    gives it none of the fixture's measurands; class 2 has no data. The
    feature is one per image, so it is false for the vitusdong client too,
    although its documents decode ASDU 3 and 9 like the others.
+8. vitusdong/iec103-dotnet `Iec103Client.ReadGenericEntries` and
+   `WriteGenericValue` (src/Iec103/Iec103Client.cs:288-313), and
+   `Iec103Server.HandleGenericRead` / `HandleGenericWrite`
+   (src/Iec103/Iec103Server.cs:538-645), serving `GenericEntries`. Both sides
+   use INF 0 for every generic ASDU (src/Iec103/Asdu103.cs:409, 429) instead
+   of the information numbers of table 18; the server's write acknowledgement
+   carries a reply code (Asdu103.cs:495). Known bugs
+   `vitusdong-generic-command-inf`, `vitusdong-generic-answer-inf`
+   (`tests/iec103/known-bugs-consumer.tsv`).
+9. Client: `RequestDisturbanceList`, `ReadDisturbance` and
+   `ReadDisturbanceTags` (src/Iec103/Iec103Client.cs:354-528); the adapter
+   runs `ReadDisturbance` and then `ReadDisturbanceTags`, which reports no tag
+   positions (`pos` null), and neither reports TOV or NOF. Its procedure is
+   not that of clause 7.4.7 (known bug `vitusdong-disturbance-procedure`),
+   and it reads SOF from the wrong bits (`vitusdong-sof-bits`). Server:
+   `HandleDisturbanceCommand` (src/Iec103/Iec103Server.cs:647-757) answers
+   TOO 24 with the fixture's records (ASDU 23: `vitusdong-disturbance-list-asdu23`)
+   and the selection with their ASDU 26 and 27, but it generates the values
+   of a channel (`DisturbanceChannel103Model.GenerateSamples`, a sine) and
+   sends the first eight indications of the station as tags, so it cannot
+   serve the fixture's records: `disturbanceDataServer` false. It also sends
+   no ASDU 28, offers every channel at once, 100 values per ASDU 30 with
+   NFE from 1, and no ASDU 23 after an interrogation (read in the source and
+   seen against its own client; no pairing evaluates it).
+10. riclolsen/go-iecp5 cs103 names the type identifications 10, 11, 21 and
+    23..31 (cs103/asdu.go:48-64, "Disturbance data transfer (not implemented
+    by this package)") and has no builder or decoder for any of them
+    (cs103/elements.go:435-451 builds 6, 7, 20 only).
+11. ARIEC103 builds ASDU 6, 7 and 20 only
+    (src/ArIEC103.Master/Protocol/Iec103AsduBuilder.cs:8-35), its
+    `AsduDecoder` names type 23 ("Disturbance-related ASDU") and decodes none
+    of 10, 11, 23..31 (src/ArIEC103.Core/Parsing/AsduDecoder.cs:116-117, 174), and its
+    slave simulator answers every other variable ASDU with a bare ACK
+    (src/ArIEC103.Master/Slave/Iec103SlaveSimulatorSession.cs:260-263).
+12. Open103: `GenericService()` returns false ("Siprotec cannot handle
+    this", Open103/IEC8705103Manager.h:523); the disturbance data are
+    `DisturbanceData` and its handlers (IEC8705103Manager.h:485-514,
+    759-1047), the control system's side of figure 10, started by the ASDU 23
+    the station sends: it selects the first fault of the list, so there is no
+    `disturbance-list` and no `--fun` (its orders carry the identified
+    function type). `DisturbanceData` flows off its end without a return for
+    the types 23 to 30, which GCC compiles as unreachable; the shim calls the
+    handlers as `DisturbanceData` dispatches them. It reads NFE of ASDU 30
+    from the wrong octets (known bug `open103-asdu30-nfe`) and keeps no TOV
+    or NOF (null in results).
 
 The server of vitusdong also has no general-interrogation flag: an indication
 with `gi: false` is left out of its station model. It finds the station by the

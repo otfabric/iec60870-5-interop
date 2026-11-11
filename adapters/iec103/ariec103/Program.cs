@@ -41,7 +41,14 @@ internal static class Program
                     throw new UsageException("server: this image has no server (ArIEC103's slave simulator cannot serve a fixture)");
                 case "client" when argv.Length >= 2:
                     return ClientRunner.Run(Adapter, argv[1], new Args(argv.Skip(2)), () => new AriLink(),
-                        what => what == "broadcast" ? "Iec103MasterSession has no SEND/NO REPLY service" : null);
+                        what => what switch
+                        {
+                            "broadcast" => "Iec103MasterSession has no SEND/NO REPLY service",
+                            // Iec103AsduBuilder builds ASDUs 6, 7 and 20 only; AsduDecoder names type 23 and decodes none of 10, 11, 23..31.
+                            "generic-read" or "generic-write" => "ARIEC103 has no generic services (Iec103AsduBuilder: ASDUs 6, 7, 20 only)",
+                            "disturbance-list" or "disturbance-transfer" => "ARIEC103 has no transmission of disturbance data (Iec103AsduBuilder: ASDUs 6, 7, 20 only)",
+                            _ => null,
+                        });
                 case "print-capabilities":
                     PrintCapabilities();
                     return Exit.Ok;

@@ -110,18 +110,46 @@ if jq -e '.event == "stopped"' <<<"${last}" >/dev/null 2>&1; then ok "stopped ev
 stop_server "${name}"
 
 # ---- field sizes other than the defaults ----
-name=$(SERVER_TAG=sizes start_server "${ADAPTER}" --link-address-size 2 --link-address 300 --cot-size 2 --ca-size 2 --ioa-size 3)
-if wait_ready "${name}"; then
-    doc=$(run_client "${ADAPTER}" interrogate --host "${name}" --link-address-size 2 --link-address 300 --cot-size 2 \
-        --ca-size 2 --ioa-size 3 --originator-address 9 --common-address 65535); CLIENT_EXIT=$?
-    if [[ "${CLIENT_EXIT}" == 0 ]] && jq -e '.ok and ([.asdus[] | select(.cot == 20)] | length > 0)
-            and ([.asdus[] | .originator] | all(. == 9)) and ([.asdus[] | .commonAddress] | all(. == 1))' <<<"${doc}" >/dev/null 2>&1
-    then ok "two-octet link address, cause and common address, three-octet object address"
-    else fail "field sizes 2/2/2/3: exit ${CLIENT_EXIT}, $(jq -r "${SUMMARY}" <<<"${doc}" 2>/dev/null)"; fi
-else
-    fail "server with field sizes 2/2/2/3 did not become ready"
+# Contract 2.3: the sizes an image takes are in its capabilities; one it does
+# not list is a usage error.
+sizes_ok=true
+for f in linkAddressSizes:2 cotSizes:2 caSizes:2 ioaSizes:3; do
+    jq -e --arg k "${f%%:*}" --argjson v "${f#*:}" '.[$k] | index($v) != null' <<<"${caps}" >/dev/null 2>&1 || sizes_ok=false
+done
+if jq -e '[.linkAddressSizes, .cotSizes, .caSizes, .ioaSizes] | all(type == "array" and length > 0)' <<<"${caps}" >/dev/null 2>&1
+then ok "capabilities: field sizes"; else fail "capabilities lack linkAddressSizes, cotSizes, caSizes or ioaSizes"; fi
+for f in linkAddressSizes:--link-address-size:0:2 cotSizes:--cot-size:1:2 caSizes:--ca-size:1:2 ioaSizes:--ioa-size:1:3; do
+    IFS=: read -r key flag lo hi <<<"${f}"
+    for ((s = lo; s <= hi; s++)); do
+        jq -e --arg k "${key}" --argjson v "${s}" '.[$k] | index($v) != null' <<<"${caps}" >/dev/null 2>&1 && continue
+        expect_exit 2 "a size the image does not list: ${flag} ${s}" "${IMAGE}" client interrogate --host nowhere "${flag}" "${s}" "${mode_flags[@]}"
+    done
+done
+# The broadcast common address of two octets, unless the image's unbalanced
+# client sends only to the common address equal to the link address
+# (unbalancedCommonAddress): then the station is given that one.
+station_ca=1 request_ca=65535
+if [[ "${LINK_MODE}" == unbalanced ]] && ! jq -e '.features.unbalancedCommonAddress == true' <<<"${caps}" >/dev/null 2>&1; then
+    station_ca=300 request_ca=300
 fi
-stop_server "${name}"
+if [[ "${sizes_ok}" == true ]]; then
+    name=$(SERVER_TAG=sizes start_server "${ADAPTER}" --link-address-size 2 --link-address 300 --cot-size 2 --ca-size 2 \
+        --ioa-size 3 --common-address "${station_ca}")
+    if wait_ready "${name}"; then
+        first=$(first_event "${name}")
+        if jq -e '.linkAddressSize == 2 and .cotSize == 2 and .caSize == 2 and .ioaSize == 3 and .linkAddress == 300' <<<"${first}" >/dev/null 2>&1
+        then ok "ready event: field sizes"; else fail "ready event without the field sizes: ${first}"; fi
+        doc=$(run_client "${ADAPTER}" interrogate --host "${name}" --link-address-size 2 --link-address 300 --cot-size 2 \
+            --ca-size 2 --ioa-size 3 --originator-address 9 --common-address "${request_ca}"); CLIENT_EXIT=$?
+        if [[ "${CLIENT_EXIT}" == 0 ]] && jq -e --argjson ca "${station_ca}" '.ok and ([.asdus[] | select(.cot == 20)] | length > 0)
+                and ([.asdus[] | .originator] | all(. == 9)) and ([.asdus[] | .commonAddress] | all(. == $ca))' <<<"${doc}" >/dev/null 2>&1
+        then ok "two-octet link address, cause and common address, three-octet object address"
+        else fail "field sizes 2/2/2/3: exit ${CLIENT_EXIT}, $(jq -r "${SUMMARY}" <<<"${doc}" 2>/dev/null)"; fi
+    else
+        fail "server with field sizes 2/2/2/3 did not become ready"
+    fi
+    stop_server "${name}"
+fi
 
 # ---- a port that is already taken ----
 name=$(start_server "${ADAPTER}"); wait_ready "${name}"

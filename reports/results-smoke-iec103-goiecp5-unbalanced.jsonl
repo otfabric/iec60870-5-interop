@@ -1,0 +1,36 @@
+{"kind":"run","startedAt":"2026-11-11T18:51:48Z","reproduce":"VERSION=dev LINK_MODE=unbalanced scripts/smoke.sh iec103 goiecp5"}
+{"kind":"implementation","name":"iec103-goiecp5","version":"v0.4.7","upstream":"riclolsen/go-iecp5","revision":"github.com/riclolsen/go-iecp5@v0.4.7","license":"LGPL-3.0 (LICENSE file); GPL-3.0 in README and file headers","independent":true}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":0,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":0,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":0,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":1000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":2000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":2000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":2000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":2000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":3000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":3000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":3000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":3000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":4000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":4000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":4000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":4000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":5000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":5000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":5000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":5000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":6000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":6000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":9000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":10000,"reason":"","waiver":"","feature":""}
+{"kind":"result","id":"iec103.unbalanced.smoke","client":"iec103-goiecp5","server":"iec103-goiecp5","outcome":"pass","durationMs":10000,"reason":"","waiver":"","feature":""}

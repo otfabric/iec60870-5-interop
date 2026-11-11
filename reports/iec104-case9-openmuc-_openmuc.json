@@ -1,1 +1,1 @@
-{"schemaVersion":"1.0","adapter":"openmuc","operation":"read","ok":false,"error":{"code":"timeout","message":"no answer to the read command"},"connected":true,"startdtConfirmed":true,"confirmations":[],"terminated":false,"asdus":[],"elapsedMs":29}
+{"schemaVersion":"1.0","adapter":"openmuc","operation":"read","ok":false,"error":{"code":"timeout","message":"no answer to the read command"},"connected":true,"startdtConfirmed":true,"confirmations":[],"terminated":false,"asdus":[],"elapsedMs":32}

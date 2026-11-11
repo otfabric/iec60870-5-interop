@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","adapter":"gisce","operation":"read-time","ok":false,"error":{"code":"link-init-timeout","message":"the link start-up was not confirmed: Protocol Exception: Link state request didn't get response"},"connected":false,"confirmations":[],"terminated":false,"asdus":[],"elapsedMs":1515.7}

@@ -79,6 +79,17 @@ if [[ "${cb101}" != "$(sed -nE 's|^require github.com/cB-Sigma/iec60870 (v[^ ]+)
     echo "FAIL iec101 iec60870 version: Dockerfile and go.mod disagree"
     status=1
 fi
+dp=adapters/iec101/digitalpetri
+need "iec101 digitalpetri version"  "version: \"$(arg ${dp}/Dockerfile DIGITALPETRI_VERSION)\""
+need "iec101 digitalpetri revision" "$(arg ${dp}/Dockerfile DIGITALPETRI_SHA)"
+need "iec101 digitalpetri maven"    "$(arg ${dp}/Dockerfile MAVEN_DIGEST)"
+need "iec101 digitalpetri jre"      "$(arg ${dp}/Dockerfile JRE_DIGEST)"
+need "iec101 digitalpetri gson"     "gson: \"$(sed -nE 's|.*<gson.version>(.*)</gson.version>.*|\1|p' ${dp}/pom.xml)\""
+need "iec101 digitalpetri slf4j"    "slf4j_simple: \"$(sed -nE 's|.*<slf4j.version>(.*)</slf4j.version>.*|\1|p' ${dp}/pom.xml)\""
+if [[ "$(grep -c '^ARG DIGITALPETRI_SHA=' ${dp}/Dockerfile)" != 2 || "$(sed -nE 's/^ARG DIGITALPETRI_SHA=(.*)$/\1/p' ${dp}/Dockerfile | sort -u | wc -l | tr -d ' ')" != 1 ]]; then
+    echo "FAIL iec101 digitalpetri: the two stages of the Dockerfile pin different revisions"
+    status=1
+fi
 # ---- IEC 102 ----
 gd=adapters/iec102/gisce
 need "iec102 gisce python"   "$(arg ${gd}/Dockerfile PYTHON_DIGEST)"

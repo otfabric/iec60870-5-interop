@@ -1,1 +1,1 @@
-{"adapter":"cbsigma","asdus":[],"confirmations":[],"connected":true,"elapsedMs":12,"error":{"code":"tls-failed","message":"no TLS session with the station: EOF"},"ok":false,"operation":"counter-interrogate","schemaVersion":"1.0","startdtConfirmed":false,"terminated":false,"tls":false}
+{"adapter":"cbsigma","asdus":[],"confirmations":[],"connected":true,"elapsedMs":14,"error":{"code":"tls-failed","message":"no TLS session with the station: EOF"},"ok":false,"operation":"counter-interrogate","schemaVersion":"1.0","startdtConfirmed":false,"terminated":false,"tls":false}

@@ -2,21 +2,87 @@
 
 What the self-tests of this repository showed, with exact counts. A count is
 the number of outcomes in `reports/results.json` (interop-result-v1); only
-`pass` passes. Every run below was made locally on 2026-11-11 on Docker for
-macOS (linux/arm64 engine) with the `:dev` images built from this commit's
-sources. Nothing has run on amd64 or in CI yet.
+`pass` passes. The sections below are the local runs made while each part was
+built (Docker for macOS, linux/arm64 engine, `:dev` images); the Release
+workflow repeats the smoke and cross-stack runs natively on amd64 and arm64
+before it publishes the images of a version.
 
 Reproduce: `make images`, then `make documents` (or the commands per row).
 
-`reports/results.json` of these runs: 4014 pass, 0 fail, 583 unsupported,
-44 known-difference, 0 infra-error. The 7 capability documents and 1647
-client result documents kept in `reports/` validate against `schemas/`
-(`scripts/validate-documents.py`, 0 errors). The IEC 101 rows are the final
-runs on the committed sources; the IEC 104 images were built before the last
-edit of THIRD_PARTY_NOTICES.md (which they copy to `/licenses`), with
-otherwise identical sources.
+`reports/results.json` is the full `make documents` run of contract 2.3
+(commit 834a191, 2026-11-11, linux/arm64, `:dev` images): 5857 pass, 0 fail,
+667 unsupported, 153 known-difference, 0 infra-error. The 13 capability
+documents and 2590 client result documents kept in `reports/` validate against
+`schemas/` (`scripts/validate-documents.py`, 0 errors). The digitalpetri
+station was changed after that run (it now waits for each reply of a command
+to leave before it queues the next, RELEASE.md v0.4.0); its smoke runs and the
+IEC 101 cross-stack runs were repeated on the changed image: 48 + 48 smoke,
+1064 pass and 45 unsupported unbalanced, 913 pass and 64 known-difference
+balanced, 0 fail.
 
 ## IEC 60870-5-101
+
+### Contract 2.3: three stacks, field sizes (2026-11-11)
+
+Run on the `:dev` images of all three IEC 101 adapters built from the
+branch of contract 2.3 (interop_version 0.4.0, before its release), on
+linux/arm64. Documents were not kept (`make documents` was not run for this
+change), so the counts are those `scripts/interop.sh` and `scripts/smoke.sh`
+printed. The three IEC 101 capability documents (kept by a smoke run with
+`REPORT_DIR`) and eleven client result documents of digitalpetri (every
+operation, and a link that does not start) validate against `schemas/`
+(`scripts/validate-documents.py`, 0 errors).
+
+| Run | Command | pass | fail | other |
+|-----|---------|-----:|-----:|------:|
+| smoke lib60870, cbsigma, digitalpetri, each link mode | `make smoke-iec101` | 6 x 48 | 0 | 0 |
+| cross-stack, unbalanced | `LINK_MODE=unbalanced scripts/interop.sh iec101 lib60870 cbsigma digitalpetri` | 1064 | 0 | 45 unsupported |
+| cross-stack, balanced | `LINK_MODE=balanced scripts/interop.sh iec101 lib60870 cbsigma digitalpetri` | 913 | 0 | 64 known-difference |
+
+Nine pairings on the 64 cases of `tests/iec101/cases.tsv` (31 with the
+default field sizes, 33 `case.fields-*`), plus the value and session checks.
+
+- **Unsupported (unbalanced, 45):** digitalpetri's client on the cases whose
+  request carries a common address other than the link address (255, 7,
+  65535, 255 with two octets, link address 300 with common address 1:
+  6 cases x 3 servers; `unbalancedCommonAddress` false), and the three
+  `case.fields-0112.*` cases (no link address field, balanced only) for all
+  nine pairings.
+- **Known difference (balanced, 64):** every case, value and session check of
+  cbsigma's client against digitalpetri's server that sends an ASDU
+  (`digitalpetri-balanced-server-no-link-reset` in
+  `tests/iec101/known-bugs.tsv`). A balanced digitalpetri station never
+  initializes its own primary direction: frames of the run (IEC101_TRACE=1,
+  cbsigma client, digitalpetri server, one-octet link address 1):
+
+  ```text
+  <- 10 c9 01 ca 16                       request status of link (9)
+  -> 10 0b 01 0c 16                       status of link (11)
+  <- 10 c0 01 c1 16                       reset of remote link (0)
+  -> e5                                   ACK
+  <- 68 09 09 68 f3 01 64 01 06 01 00 00 14 74 16   C_IC_NA_1 act, FCB 1
+  -> e5                                   ACK
+  -> 68 09 09 68 73 01 64 01 07 01 00 00 14 f5 16   C_IC_NA_1 actcon, FCV 1, FCB 1, no status/reset before it
+     (repeated three times, no answer; the line is closed)
+  ```
+
+  IEC 60870-5-101:2003 clause 6 (balanced transmission, figures 8 and 9)
+  has each station reset the other's link before user data: the primary
+  sends request status of link and reset of remote link, and a secondary
+  that was not reset answers only those two. cB-Sigma's secondary keeps
+  that state and ignores the data, and so does the client of go-iec60870-5
+  (a consumer, in its suite against the same image); lib60870-C and digitalpetri accept user
+  data on a secondary that was never reset, so their pairings with a
+  digitalpetri station pass. The library code is
+  `BalancedEngine` (only the CLIENT role runs the bring-up).
+- digitalpetri's client and server agree with lib60870-C and cB-Sigma on
+  every other case in both modes, including all field-size cases: two-octet
+  link address (also 300), cause with originator address, common address
+  (broadcast 65535; 255 an ordinary address), three-octet object address
+  (70000 refused with cause 47), and the balanced line without a link address
+  field.
+
+### Contract 2.2: two stacks (2026-11-11)
 
 | Run | Command | pass | fail | other |
 |-----|---------|-----:|-----:|------:|
@@ -52,17 +118,27 @@ address with a three-octet object address; a link that does not start
 (`link-init-timeout`, exit 3); a second connection while one is served
 (refused).
 
-### Not shown by these runs
+### Not shown by the contract 2.2 run
 
 - The pair is not two fully independent oracles: cB-Sigma's IEC 101 link was
-  debugged against lib60870-C (docs/REFERENCE_STACKS.md). A third peer
-  (digitalpetri) is planned.
+  debugged against lib60870-C (docs/REFERENCE_STACKS.md). digitalpetri is
+  the third peer since contract 2.3 (above).
 - Non-default field sizes were not run across stacks, only each adapter
-  against itself.
+  against itself (they are since contract 2.3, above).
 - Balanced mode with distinct link addresses (`--remote-link-address` other
   than `--link-address`): cbsigma cannot, and no lib60870 pairing ran it.
-- `--link-address-size 0` was not run.
+- `--link-address-size 0` was not run (it is since contract 2.3).
 - Interrogation groups and qualities on M_BO_NA_1 have no IEC 101 fixture yet.
+
+Not shown by the contract 2.3 run either:
+
+- A one-octet information object address: no field-size case uses
+  `--ioa-size 1` (the four other sets are 0112, 1213, 2122 and 2223).
+- Balanced mode with distinct link addresses across stacks: no case of
+  `tests/iec101/cases.tsv` passes `--remote-link-address`.
+- digitalpetri's unbalanced client when the common address differs from the
+  link address: it declares `unbalancedCommonAddress` false, so those cases
+  are unsupported (above).
 
 ### Observations
 
@@ -85,7 +161,10 @@ address with a three-octet object address; a link that does not start
 
 ### Known upstream defects
 
-None found for IEC 101 (`tests/iec101/known-bugs.tsv` is empty).
+One, from the contract 2.3 run: `digitalpetri-balanced-server-no-link-reset`
+in `tests/iec101/known-bugs.tsv` (a balanced digitalpetri station sends user
+data without resetting the controlling station's link first; evidence
+above).
 
 ## IEC 60870-5-102
 
@@ -168,6 +247,8 @@ siblings fix the address range to 1..8 and the record to its register names
 
 ## IEC 60870-5-103
 
+### Contract 2.1 run
+
 Run locally on 2026-11-11 (linux/arm64, `:dev` images of this commit), with
 `REPORT_DIR` set; `results.json` of the IEC 103 runs: 182 pass, 0 fail,
 4 unsupported, 45 known-difference, 0 infra-error. The 4 capability
@@ -212,7 +293,7 @@ as their own bugs (7 each) and those of goiecp5 and vitusdong as vitusdong's
 | ariec103 v1.2.31-3-gec08dd7: general command without the RII | 4 command cases, values.command-* (3) (ariec103 → vitusdong) | `68 09 09 68 53 01 14 81 14 01 A0 10 02 B0 16`: FUN 160, INF 16, DCO 2 and no RII (clause 7.3.2.4); go-iec60870-5's consumer suite saw `14 81 14 01 A0 63 02` and its server, which checks the length, sends no acknowledgement; Iec103Server takes the short ASDU |
 | open103 887ff5a5: a command only for the typical INF of the identified function type | 4 command cases, values.command-* (3) (open103 → vitusdong) | nothing sent (error `failed`): vitusdong identifies with FUN 255, for which `CommandTrasmission` allows no INF; against a station of FUN 160 (go-iec60870-5's consumer suite) it sent 16..19 and nothing for 160/23, whose FUN column in table 17 is typical, not mandatory |
 
-### Not shown by these runs
+#### Not shown by the contract 2.1 run
 
 - No server in this run follows IEC 60870-5-103 in its replies, so none of the
   case expectations that involve an interrogation, an identification or a
@@ -223,11 +304,61 @@ as their own bugs (7 each) and those of goiecp5 and vitusdong as vitusdong's
   against one deviating server.
 - vitusdong is not independent of ARIEC103 (its test oracle is a copy of the
   ArIEC103 simulator), which matters for the ariec103 → vitusdong pairing.
-- Measurands (ASDU 3/9 as class 2 data), broadcast clock synchronization,
-  generic services and disturbance data: no server has them in this run.
+- Measurands (ASDU 3/9 as class 2 data) and broadcast clock synchronization:
+  no server has them in this run; generic services and disturbance data: see
+  below.
 - The images of the four IEC 103 adapters were built for linux/amd64 under
   emulation and answered an interrogation there (2026-11-11); the self-tests
   ran on linux/arm64 only.
+
+### Contract 2.3: generic services and disturbance data
+
+Run locally on 2026-11-11 (linux/arm64, `:dev` images of branch
+feat/iec103-generic-disturbance), on the 16 cases of `tests/iec103/cases.tsv`
+(7 of them new in contract 2.3):
+
+| Run | Command | pass | fail | other |
+|-----|---------|-----:|-----:|------:|
+| smoke vitusdong (server and client) | `scripts/smoke.sh iec103 vitusdong` | 53 | 0 | 0 |
+| smoke goiecp5, ariec103, open103 (clients, against vitusdong's server) | `scripts/smoke.sh iec103 <adapter>` | 34 each | 0 | 0 |
+| cross-stack, unbalanced | `scripts/interop.sh iec103 vitusdong goiecp5 ariec103 open103` | 36 | 0 | 45 known-difference, 39 unsupported |
+
+The 45 known differences are those of the contract 2.1 run (above). Of the
+pass count, the generic and disturbance-list cases passed only for vitusdong
+against itself, which is not evidence (below). In this harness only
+vitusdong has a server, and it declares `genericServices` and
+`disturbanceList` but not `disturbanceDataServer` (it cannot serve the
+fixture's tags and values):
+
+| Scenario | vitusdong → vitusdong | goiecp5, ariec103, open103 → vitusdong |
+|----------|-----------------------|----------------------------------------|
+| case.generic-read-1-3, -1-4-description, -not-existing; case.generic-write-1-3, -read-only; values.generic-read, values.generic-write | pass | unsupported (no generic services) |
+| case.disturbance-list, values.disturbance-list | pass | unsupported (no `disturbance-list`) |
+| case.disturbance-transfer, values.disturbance-transfer, values.disturbance-values | unsupported (server) | unsupported (server; open103 has the client) |
+
+vitusdong against itself is self-interoperability, not evidence: both of its
+sides share the deviations below. The independent evidence of contract 2.3 is
+the consumer run of go-iec60870-5 (`iec103/interop`, 2026-11-11, the same
+images): Open103's control system transferred the fixture's disturbance from
+that library's protection equipment, and vitusdong's control system and
+protection equipment met that library's. What it saw on the wire is in
+`tests/iec103/known-bugs-consumer.tsv` (an entry there cannot reproduce in
+this harness, so `scripts/interop.sh` does not read it):
+
+| Known bug | Wire evidence (consumer run) |
+|-----------|------------------------------|
+| vitusdong-generic-command-inf (client) | `15 81 2A 01 FE 00 01 01 01 03 01`: ASDU 21, cause 42, FUN 254, INF 0, RII 1, NOG 1, GIN 1.3, KOD 1; `0A 81 28 01 FE 00 01 01 01 03 01 03 02 01 C2 01`: ASDU 10, cause 40, INF 0. Table 18: 244 and 250 |
+| vitusdong-generic-answer-inf (server) | `0A 81 2A 01 FE 00 01 01 01 01 01 03 02 01 E8 03` (answer to INF 244) and `0A 81 28 01 FE 00 01 01 01 02 01 16 01 01 00` (answer to INF 250: a GRC data set where figure 17 has NO 0) |
+| vitusdong-disturbance-list-asdu23 (server) | `17 81 1F 01 FF 00 07 00 80 0C 00 1E 0F 09 0A 1A`: VSQ 81, FUN 255 (the order had 160), SOF 80 for TP |
+| vitusdong-sof-bits (client) | the station's `17 01 1F 01 A0 00 07 00 01 0C 00 1E 0F A9 0A 1A` (SOF 01: TP) reported as `tp: false` |
+| vitusdong-disturbance-procedure (client) | `18 81 1F 01 FF 00 01 01 07 00 00` (TOO 1), ASDU 26, then `19 81 1F 01 FF 00 40 01 07 00 00` (ASDU 25 TOO 64) and `18 ... 02 01 07 00 00` (TOO 2); the station ends the transfer at TOO 64 and answers TOO 2 with `1F 81 1F 01 FF 00 22 01 07 00 00` (TOO 34); the client waits for ASDU 27 and fails |
+| open103-asdu30-nfe (client) | the whole procedure ran (TOO 1, 2, 16, ASDU 25 TOO 68, TOO 8 and TOO 66 for ACC 1 and 2, TOO 64); the description, the four tags with their positions and the ratings of both channels arrived as in the fixture, but only values 0..24 of channel 1 are where they belong (25..39 and all of channel 2 stored at a wrong index: NFE read through an unpacked struct) |
+
+Not shown: a generic read of headings, a group or a directory (INF 240, 241,
+243), the general interrogation of generic data, writes with confirmation
+or abort, aborts of a disturbance transfer, more than one record. No harness
+server serves the fixture's disturbance values, so `disturbance-transfer`
+has no pairing inside the harness.
 
 ### Other deviations seen on the wire
 

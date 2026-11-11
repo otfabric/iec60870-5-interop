@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: EPL-2.0 -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.otfabric</groupId>
+  <artifactId>iec60870-5-interop-iec101-digitalpetri</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <description>iec60870-5-interop IEC 60870-5-101 adapter for digitalpetri/iec60870</description>
+
+  <properties>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- digitalpetri/iec60870 is not published: the Dockerfile builds it from
+         the pinned commit (DIGITALPETRI_SHA) and installs this version of it
+         into the local Maven repository of the build stage. -->
+    <digitalpetri.version>0.1.0-SNAPSHOT</digitalpetri.version>
+    <gson.version>2.14.0</gson.version>
+    <!-- The SLF4J version digitalpetri's pom pins at the commit. -->
+    <slf4j.version>2.0.20</slf4j.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.digitalpetri.iec60870</groupId>
+      <artifactId>iec60870-tcp</artifactId>
+      <version>${digitalpetri.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>${gson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>iec60870-5-interop-iec101-digitalpetri</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.16.0</version>
+        <configuration>
+          <compilerArgs>
+            <arg>-Xlint:all,-processing,-serial</arg>
+            <arg>-Werror</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.2</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>org.otfabric.iec101interop.Main</mainClass>
+                </transformer>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/versions/*/module-info.class</exclude>
+                    <exclude>module-info.class</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

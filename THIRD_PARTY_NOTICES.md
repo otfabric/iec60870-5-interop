@@ -16,11 +16,12 @@ next to the licence texts.
 | `adapters/iec104/part5/` (links pascaldekloe/part5) | GPL-3.0-or-later |
 | `adapters/iec101/lib60870/` (links lib60870-C) | GPL-3.0-or-later |
 | `adapters/iec101/cbsigma/` (links cB-Sigma/iec60870 and the modules it needs) | GPL-3.0-or-later |
+| `adapters/iec101/digitalpetri/` (links digitalpetri/iec60870, EPL-2.0) | **EPL-2.0**, the one exception: see below |
 | `adapters/iec103/common/dotnet/`, `adapters/iec103/vitusdong/`, `adapters/iec103/ariec103/` (link vitusdong/iec103-dotnet, ARIEC103) | GPL-3.0-or-later |
 | `adapters/iec103/open103/` (compiles Open103's headers with its shim) | GPL-3.0-or-later |
 | `adapters/iec103/goiecp5/` (links riclolsen/go-iecp5) | GPL-3.0-or-later |
 | `adapters/iec102/gisce/` (imports gisce/iec870ree, AGPL-3.0) | GPL-3.0-or-later |
-| The published reference images | GPL-3.0 (they contain the libraries below); `iec102-gisce` GPL-3.0-or-later and AGPL-3.0 |
+| The published reference images | GPL-3.0 (they contain the libraries below); `iec102-gisce` GPL-3.0-or-later and AGPL-3.0; `iec101-digitalpetri` EPL-2.0 |
 
 The lib60870 and openmuc adapter programs are derivative works of GPL-3.0
 libraries. The wendy512 adapter links an Apache-2.0 and an LGPL-3.0 library,
@@ -133,6 +134,30 @@ from Debian trixie, MIT), with the IEC 101 driver of this repository,
 The modules linked into the adapter binary are those `go list -deps` names
 at build time; the Dockerfile copies the licence (and NOTICE) file of every
 one of them to `/licenses/<module path>/` and fails when one has none.
+
+## Image `iec60870-5-interop-iec101-digitalpetri`
+
+| Component | Version | Licence | Source |
+|-----------|---------|---------|--------|
+| digitalpetri/iec60870 (modules iec60870-core, -cs101, -cs104, -application, -transport-tcp, -tcp) | commit `33e52b360c0fa9bc6099eb0b0aa19eed1eff9ad0` (0.1.0-SNAPSHOT, no release) | EPL-2.0 | https://github.com/digitalpetri/iec60870 |
+| Netty (buffer, codec, common, handler, resolver, transport, transport-native-unix-common) | 4.1.140.Final | Apache-2.0 | https://netty.io (Maven Central) |
+| SLF4J API and simple binding | 2.0.20 | MIT | https://www.slf4j.org (Maven Central) |
+| JSpecify | 1.0.1 | Apache-2.0 | https://jspecify.dev (Maven Central) |
+| jOOU | 0.9.6 | Apache-2.0 | https://github.com/jOOQ/jOOU (Maven Central) |
+| Gson (Google), with Error Prone annotations | 2.14.0, 2.48.0 | Apache-2.0 | https://github.com/google/gson (Maven Central) |
+| Adapter | this repository, `adapters/iec101/digitalpetri/` | EPL-2.0 | https://github.com/otfabric/iec60870-5-interop |
+| Eclipse Temurin JRE 25 and base system | Ubuntu noble | GPL-2.0 with Classpath Exception; various | https://adoptium.net |
+
+digitalpetri/iec60870 is EPL-2.0 and names no Secondary License (EPL-2.0
+Exhibit A), so it may not be combined with GPL code into one program. Unlike
+every other adapter, this one is therefore distributed under EPL-2.0, the
+library's own licence; the libraries it links besides are permissive.
+Nothing GPL is in this image. The library is not on Maven Central: the
+Dockerfile builds it from the pinned commit, which with the Dockerfile is the
+corresponding source. Licence texts in the image: `/licenses/EPL-2.0.txt`,
+`/licenses/digitalpetri-iec60870/LICENSE.md`, `/licenses/Apache-2.0.txt`, and
+the licence files the other jars carry, under `/licenses/<jar>/`
+(`/licenses/JARS.txt` lists every jar in the adapter).
 
 ## Image `iec60870-5-interop-iec103-vitusdong`
 

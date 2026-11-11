@@ -1,6 +1,6 @@
 # Container contract
 
-Version: **2.2** (`contract_version` in [versions.yaml](../versions.yaml))
+Version: **2.3** (`contract_version` in [versions.yaml](../versions.yaml))
 
 Every adapter image exposes the same commands, flags, JSON documents and exit
 codes, for each standard of the IEC 60870-5 family it implements. Consumers
@@ -14,6 +14,7 @@ a reader of 1.3 documents reads 2.0 documents unchanged.
 
 | Version | Change |
 |---------|--------|
+| 2.3 | [IEC 101](#field-sizes): the field sizes of a run are selectable and declared. Capability documents of IEC 101 have `linkAddressSizes`, `cotSizes`, `caSizes` and `ioaSizes` (the sizes the image takes; a size it does not list is a usage error) and the feature `unbalancedCommonAddress`; the server's `ready` event has `linkAddressSize`, `cotSize`, `caSize` and `ioaSize`; a run selects the sizes by giving the same link flags to server and client ([field sizes](#field-sizes)). The image `iec101-digitalpetri` (digitalpetri/iec60870). [IEC 103 generic services and disturbance data](#iec-103-generic-services-and-disturbance-data): the client operations `generic-read` (`--gin`, `--kod`), `generic-write` (`--gin`, `--kod`, `--type`, `--size`, `--value`), `disturbance-list` (`--fun`) and `disturbance-transfer` (`--fan`, `--fun`); `generic`, `disturbances` and `disturbance` in results; confirmations with causes 40 to 43; the features `genericServices`, `disturbanceList`, `disturbanceData` and `disturbanceDataServer`; `generic` and `disturbances` in the IEC 103 fixture. ASDU documents unchanged |
 | 2.2 | [IEC 102](#iec-102): unbalanced only, link address and common address of two octets by default (`--link-address-size`, `--ca-size`), `--profile standard\|ree` and `--access-key` (the REE session C_AC_NA_2 / C_FS_NA_2 around every operation, `session` in results, the error `login-refused`); the client operations `connect`, `read-totals` (`--kind`, `--record`, `--from`, `--to`, `--first`, `--last`), `read-time`, `read-product`, `set-time` (`--time`), `read-tariff` (`--register`, `--from`, `--to`); ASDU documents of IEC 102 (`record`, local times a and b with `su`, integrated totals with the quality octet, tariff records); confirmations with the causes 13..18; the server events of IEC 102; `linkAddressSizes`, `caSizes`, `profiles` and the IEC 102 features in capability documents; the IEC 102 fixture. The image `iec102-gisce` (client only) |
 | 2.1 | [IEC 103](#iec-103): unbalanced only, a one-octet link address, no information object addresses; the client operations `connect`, `interrogate` (`--scn`), `clock-sync` (`--broadcast`), `command` (`--fun`, `--inf`, `--dco`, `--rii`), `monitor`; ASDU documents of IEC 103 (`fun`, `inf`, `dpi`, `sin`, `time32`, `values`, ...), `asduTypes` and the IEC 103 features in capability documents; confirmations with causes 8, 20 and 21; server events of IEC 103. An image may be a client only (`roles.server` false): `server` is then a usage error |
 | 2.0 | One repository for the IEC 60870-5 family (`iec60870-5-interop`, from `iec104-interop` 0.6.0, contract 1.3). Image `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`; entrypoint `/usr/local/bin/iec60870-5-interop`; readiness file `/run/iec60870-5-interop/ready`. `standard` in capability documents (and `transport`, `linkModes` for the serial standards). [IEC 101, 102 and 103](#iec-101-102-and-103): the FT 1.2 byte stream over one TCP connection, port 2401, the [link flags](#link-flags), the error `link-init-timeout`, results without `startdtConfirmed`; C_TS_NA_1 in ASDU documents (`fbp`). IEC 104 is contract 1.3 under the new names |
@@ -33,7 +34,9 @@ What a *station* does with a request is defined by its fixture: see
 
 - [Standards and images](#standards-and-images)
 - [IEC 101, 102 and 103](#iec-101-102-and-103)
+  - [Field sizes](#field-sizes)
 - [IEC 103](#iec-103)
+  - [IEC 103 generic services and disturbance data](#iec-103-generic-services-and-disturbance-data)
 - [IEC 102](#iec-102)
 - [Image layout](#image-layout)
 - [Commands](#commands)
@@ -59,7 +62,7 @@ What a *station* does with a request is defined by its fixture: see
 An image implements one standard with one stack:
 `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`, for example
 `iec60870-5-interop-iec101-lib60870` and `iec60870-5-interop-iec104-lib60870`.
-Images of this version: IEC 101 `lib60870`, `cbsigma`; IEC 102 `gisce`
+Images of this version: IEC 101 `lib60870`, `cbsigma`, `digitalpetri`; IEC 102 `gisce`
 (client); IEC 103 `vitusdong` (server and client), `goiecp5`, `ariec103`,
 `open103` (clients); IEC 104 `lib60870`, `openmuc`, `wendy512`, `cbsigma`,
 `part5`.
@@ -121,6 +124,32 @@ does not fit is a usage error. `--originator-address` is sent only with
 There are no APCI, TLS, security or redundancy flags for the serial
 standards: they are unknown flags (exit 2).
 
+### Field sizes
+
+IEC 101 (contract 2.3). IEC 60870-5-101 leaves the sizes of the link address
+field, the cause of transmission, the common address and the information
+object address to the system (the interoperability list, clause 8 of IEC
+60870-5-101); nothing on the wire says which a station
+uses, so both ends are configured alike.
+
+- A run selects them with the [link flags](#link-flags) `--link-address-size`,
+  `--cot-size`, `--ca-size` and `--ioa-size` (and `--link-address`), given
+  with the **same values to the server and to every client** of the run.
+- The capability document lists the sizes the image takes, in
+  `linkAddressSizes` (a subset of `[0, 1, 2]`), `cotSizes` (`[1, 2]`),
+  `caSizes` (`[1, 2]`) and `ioaSizes` (`[1, 2, 3]`). A size it does not list
+  is a usage error (exit 2) of `server` and `client`; so is a size the
+  contract does not have, and `--link-address-size 0` in unbalanced mode.
+- A pairing can run a set of sizes when both images list every size of it.
+  The broadcast common address follows `--ca-size` (255 or 65535); with two
+  octets 255 is an ordinary address.
+
+A feature says what an image cannot do with a set of sizes:
+
+| Feature | Meaning when false |
+|---------|--------------------|
+| `unbalancedCommonAddress` | Client, unbalanced mode: a request whose common address is not `--link-address` is a usage error, since the library sends an ASDU to the station whose link address equals its common address (and one with the broadcast common address to all stations, unconfirmed). `connect` and `monitor` send no ASDU and are not affected |
+
 > The flag is `--link-mode`, not `--mode`: the `command` operation has had
 > `--mode direct|select|sbo|cancel` since contract 1.0, and a client takes the
 > link flags and the operation flags on one command line.
@@ -133,7 +162,9 @@ for IEC 104 ([`server`](#server), [FIXTURES.md](FIXTURES.md)), with these
 differences:
 
 - The `ready` event has `standard`, `mode` (the link mode) and `linkAddress`
-  besides `adapter`, `address`, `fixture` and `commonAddress`.
+  besides `adapter`, `address`, `fixture` and `commonAddress`; IEC 101 (2.3)
+  also `linkAddressSize`, `cotSize`, `caSize` and `ioaSize`, the field sizes
+  the station runs with.
 - Events: `ready`, `connection-opened`, `connection-closed` (the TCP
   connection), `interrogation`, `counter-interrogation`, `read`, `clock-sync`,
   `command`, `stopped`. No `data-transfer-*` events (`dataTransferEvents` is
@@ -183,8 +214,9 @@ differences:
 
 `standard` (`iec60870-5-101`, ...), `transport` (`tcp-stream`) and
 `linkModes` (the modes the self-tests exercise) are required for a serial
-standard. `protocol` has the value of `standard`. The features `unbalancedMode`,
-`balancedMode` and `distinctBalancedAddresses` are added; the IEC 104-only
+standard, and for IEC 101 (2.3) the size lists of [field sizes](#field-sizes). `protocol` has the value of `standard`. The features `unbalancedMode`,
+`balancedMode` and `distinctBalancedAddresses` are added, and for IEC 101 (2.3)
+`unbalancedCommonAddress`; the IEC 104-only
 features (`apciParameters`, `tls*`, `file*`, `redundancy*`,
 `secureAuthentication`, `dataTransferEvents`, `multipleConnections`,
 `timeTaggedCommands`) are present and false. See [CAPABILITIES.md](CAPABILITIES.md).
@@ -258,6 +290,7 @@ Common flags: `--host`, `--port` (2401), `--common-address`,
 | `clock-sync` | `--time T` (now), `--broadcast` | ASDU 6, cause 8, FUN 255, INF 0, CP56Time2a. With `--broadcast` SEND/NO REPLY (function 4) to link address 255 and common address 255; only with the feature `broadcastClockSync` | Addressed: ASDU 6 with cause 8 arrives (confirmation `{cot: 8}`). Broadcast: the frame was sent; nothing can answer |
 | `command` | `--fun N`, `--inf N` (required), `--dco D` (required: 1 or `off`, 2 or `on`; 0 and 3 are sent as they are), `--rii N` (1) | ASDU 20 (general command), cause 20, the DCO and the return information identifier | ASDU 1 or 2 with the command's FUN and INF, cause 20 and the RII as SIN arrives (confirmation `{cot: 20}`). Cause 21 is the error `negative-confirmation` (confirmation `{cot: 21, negative: true}`). The change of state (ASDU 1, cause 12, clause 7.4.4) follows the confirmation: it is in `asdus` when `--collect-ms` covers it |
 | `monitor` | `--duration-ms N` (1000), `--max-asdus N` (0) | Nothing but the polls | The duration passed or the number of ASDUs arrived, with the link still up |
+| `generic-read`, `generic-write`, `disturbance-list`, `disturbance-transfer` | | See [IEC 103 generic services and disturbance data](#iec-103-generic-services-and-disturbance-data) (contract 2.3) | |
 
 The other operations of IEC 101 and 104 (`counter-interrogate`, `read`,
 `test-command`, files, ...) are not in `clientOperations` and are usage errors.
@@ -267,10 +300,43 @@ its own is the error `failed`.
 
 The result document is that of IEC 101: `connected` is the confirmed reset of
 the communication unit, and there is no `startdtConfirmed`. `confirmations`
-has the causes 8, 20 and 21 of the table above, `terminated` is the
+has the causes 8, 20 and 21 of the table above (and 40 to 43 of the generic services), `terminated` is the
 termination of the interrogation. `asdus` has every ASDU received, the
 identification after the reset included; cyclic measurands (cause 2) arrive
 whenever the client polls class 2, so their number in a result is not fixed.
+
+### IEC 103 generic services and disturbance data
+
+Contract 2.3. The generic services (clause 7.4.8) and the transmission of
+disturbance data (clause 7.4.7) run the library's own procedure: the
+adapter calls it and reports what it decoded, it does not build the ASDUs.
+An image lists the operations its library has in `clientOperations`; any
+other is a usage error (exit 2), and so is a flag the library cannot honour
+(`--fun` where the library fixes the function type of its orders).
+
+| Operation | Flags | Sends | Succeeds when |
+|-----------|-------|-------|---------------|
+| `generic-read` | `--gin G.E` (required), `--kod N` (1, actual value) | ASDU 21, cause 42, FUN 254, INF 244 (read a single entry), the RII, NOG 1, GIN, KOD | ASDU 10, cause 42, with the RII arrives (CONT 0): confirmation `{cot: 42}`. Cause 43 (invalid data) is the error `negative-confirmation` (`{cot: 43, negative: true}`) |
+| `generic-write` | `--gin G.E`, `--type 1\|3\|4\|7`, `--size N`, `--value V` (required), `--kod N` (1) | ASDU 10, cause 40, FUN 254, INF 250 (write with execution), the RII, one data set: GIN, KOD, GDD (`--type`, `--size`, NUMBER 1), the value | ASDU 10, cause 40, with the RII arrives: confirmation `{cot: 40}`. Cause 41 is the error `negative-confirmation` (`{cot: 41, negative: true}`) |
+| `disturbance-list` | `--fun N` (the library's choice) | ASDU 24, cause 31, TOO 24 (request for the list of recorded disturbances) | ASDU 23, cause 31, arrives |
+| `disturbance-transfer` | `--fan N` (required), `--fun N` (the library's choice) | The procedure of clause 7.4.7 (figure 10): ASDU 24 TOO 1 (selection), TOO 2 (request for disturbance data), TOO 16 (tags), TOO 8 (each channel), ASDU 25 TOO 68, 66 and 64 | The library completed its procedure for FAN N. A library that cannot request the list (TOO 24) starts it from the list the station sends after a general interrogation (clause 7.4.7) and transfers the first fault of that list: when that is not FAN N, the error `failed` |
+
+`--type`: 1 ASCII (`--size` the number of characters, `--value` the text), 3
+unsigned integer, 4 integer (`--size` 1, 2 or 4), 7 R32.23 (`--size` 4).
+
+The result document has, besides the fields of IEC 101:
+
+| Field | Operations | Content |
+|-------|------------|---------|
+| `generic` | `generic-read`, `generic-write` (when an answer arrived) | `{cot, sets}`: the cause of the answer and its data sets, each `{gin: "G.E", kod, type, size, number, values}`; `values` has the text (type 1) or the numbers (types 3, 4, 7, 8, 22) of the GID in order; another data type has `data` (the GID, lower-case hex) instead of `values` |
+| `disturbances` | `disturbance-list` | One `{fan, sof: {tp, tm, test, otev}, time}` per fault of the ASDU 23, in order; `time` the CP56Time2a as `2026-01-02T03:04:05.678Z` |
+| `disturbance` | `disturbance-transfer` | `{fan, tov, nof, noc, noe, interval, start, tags, channels}`: the description of ASDU 26 (`start` the CP32Time2a of the first value as `HH:MM:SS.mmm`), `tags` one `{pos, fun, inf, dpi}` per tag in the order of the ASDUs 29 (`pos` the TAP), `channels` one `{acc, rpv, rsv, rfa, values}` per channel, `values` the NOE values (SDV, signed) by value number. A field the library does not report is `null` |
+
+`asdus` has every ASDU received, as for the other operations; ASDUs 10, 11,
+21 and 23 to 31 keep `data` (not decoded into fields). The outcome line of
+the self-tests leaves them out for these operations (`scripts/lib.sh`).
+No server events are defined for the generic services and the disturbance
+data in this version.
 
 ### IEC 103 ASDU documents
 
@@ -299,7 +365,7 @@ The fields of [ASDU documents](#asdu-documents) with these differences:
 | 8 | `general-interrogation-termination` | `scn` |
 | 9 | `measurands-ii` | `values` |
 | 20 | `general-command` | `dco` (the octet), `rii` |
-| 10, 11, 21, 23..31 | `generic-data`, `generic-identification`, `generic-command`, `disturbance-list`, `disturbance-order`, `disturbance-acknowledgement`, `disturbance-ready`, `channel-ready`, `tags-ready`, `tags`, `disturbance-values`, `disturbance-end` | `data` (not decoded in this version) |
+| 10, 11, 21, 23..31 | `generic-data`, `generic-identification`, `generic-command`, `disturbance-list`, `disturbance-order`, `disturbance-acknowledgement`, `disturbance-ready`, `channel-ready`, `tags-ready`, `tags`, `disturbance-values`, `disturbance-end` | `data` (not decoded; what the library decoded is in `generic`, `disturbances` and `disturbance`, [above](#iec-103-generic-services-and-disturbance-data)) |
 
 `time32` is a CP32Time2a, `HH:MM:SS.mmm`: it has no date. `timeInvalid: true`
 when its IV bit is set. `values` is one `{value, ov, er}` per measurand: the
@@ -322,8 +388,10 @@ present and false except `generalInterrogation`, `clockSync` and
 | `identification` | Server: ASDU 5 after a reset of the communication unit. Client: reports it |
 | `measurands` | Server: the fixture's measurands as class 2 data. Client: decodes ASDU 3 and 9 |
 | `broadcastClockSync` | `clock-sync --broadcast` (client) or a broadcast ASDU 6 is accepted (server) |
-| `genericServices` | ASDU 10, 11 and 21 (no operation in this version) |
-| `disturbanceData` | ASDU 23..31 (no operation in this version) |
+| `genericServices` | Client: `generic-read` and `generic-write`. Server: the fixture's generic entries (ASDU 21 INF 244, ASDU 10 INF 250) |
+| `disturbanceList` | Client: `disturbance-list`. Server: the fixture's list of recorded disturbances (ASDU 23) |
+| `disturbanceData` | Client: `disturbance-transfer` |
+| `disturbanceDataServer` | Server: the transfer of the fixture's records, with their tags and values (ASDUs 26 to 31) |
 
 ## IEC 102
 

@@ -18,6 +18,39 @@ section per version, newest first, each ending with a `---` line.
 
 ---
 
+## v0.4.0
+
+**Date:** 2026-11-11
+**Previous release:** v0.3.0
+
+### Added
+
+- Image `iec101-digitalpetri`: digitalpetri/iec60870 at commit `33e52b36` (no release, 0.1.0-SNAPSHOT; EPL-2.0, Java), the third IEC 101 reference and the first not debugged against lib60870-C. The library's own TcpIec101Client and TcpIec101Server (its FT 1.2 link over Netty, no bridge), built from the pinned commit in a multi-stage Dockerfile; unbalanced and balanced, client and server, every field size. The station answers the fixture in the library's raw-ASDU hook. In an unbalanced link the library queues a spontaneous ASDU in class 1 and every other cause in class 2, served from its own thread, so the station queues a command's report and its termination only once the ASDU before has left the line (bounded wait): confirmation, report, termination stay in that order whatever the controlling station polls. Status validated.
+- Container contract 2.3 (docs/CONTAINER_CONTRACT.md, "Field sizes"): IEC 101 capability documents list the field sizes the image takes (`linkAddressSizes`, `cotSizes`, `caSizes`, `ioaSizes`; another is a usage error), the server's `ready` event reports them (`linkAddressSize`, `cotSize`, `caSize`, `ioaSize`), and the feature `unbalancedCommonAddress` says whether an unbalanced client sends a request with a common address other than its link address. lib60870 and cbsigma take every size and have the feature; digitalpetri takes every size and has not.
+- 33 IEC 101 cases with field sizes other than the defaults, `case.fields-<sizes>.*` in `tests/iec101/cases.tsv`: 2/2/2/3, 1/2/1/3 and 2/1/2/2 (link address, cause, common address, object address) in both link modes and 0/1/1/2 (no link address field) in balanced mode, including the broadcast common address 65535, 255 as an ordinary address, a link address of 300 and an object address of 70000. `scripts/interop.sh` gives a case's link flags to its server as well and skips a pairing that does not declare a size (or `unbalancedCommonAddress` where needed) as unsupported.
+- `tests/iec101/known-bugs.tsv`: an entry may name a role (`<adapter>@server`) and, for the serial standards, match the link mode (the regex sees the operation followed by ` --link-mode <mode>`). First entry: a balanced digitalpetri station sends user data without initializing its own primary direction (docs/COMPATIBILITY.md).
+- The smoke test of an IEC 101 image checks the size lists, a size the image does not list (usage error), and the sizes in the `ready` event.
+- IEC 103 generic services and disturbance data (contract 2.3, docs/CONTAINER_CONTRACT.md, "IEC 103 generic services and disturbance data"): the client operations `generic-read` (ASDU 21, INF 244), `generic-write` (ASDU 10, INF 250), `disturbance-list` (TOO 24) and `disturbance-transfer` (the whole procedure of clause 7.4.7); `generic`, `disturbances` and `disturbance` in results; confirmations with causes 40 to 43; the features `genericServices`, `disturbanceList`, `disturbanceData`, `disturbanceDataServer`; `generic` entries and a disturbance record (FAN 7, four tags, two channels of 40 values) in the IEC 103 fixture. Seven cases in `tests/iec103/cases.tsv`, five value checks. Per pinned source: vitusdong implements both as master and slave (its server generates its own samples, so it does not declare `disturbanceDataServer`); Open103 implements the disturbance transfer as master (through a shim, `DisturbanceData` has no return for types 23 to 30); ARIEC103 and go-iecp5 cs103 implement neither (declared unsupported).
+- `tests/iec103/known-bugs-consumer.tsv`: six upstream bugs (vitusdong generic INF, ASDU 23 VSQ/FUN/SOF, SOF bits, disturbance procedure; Open103 ASDU 30 NFE) that no pairing of this harness shows, seen on the wire against a consumer's station or control system (docs/COMPATIBILITY.md). `scripts/interop.sh` does not read it; consumers apply it with `known-bugs.tsv`.
+
+### Changed
+
+- `adapters/iec101/digitalpetri/` is EPL-2.0, the library's licence, not GPL-3.0-or-later like the other adapters: digitalpetri/iec60870 has no Secondary License notice, so it cannot be combined with GPL code (AGENTS.md rule 6 names the exception, THIRD_PARTY_NOTICES.md). `licenses/EPL-2.0.txt` added.
+- `schemas/capabilities.schema.json`: `cotSizes` and `ioaSizes` added, `linkAddressSizes` and `caSizes` extended to IEC 101 (`linkAddressSizes` 0 for IEC 101 only); an IEC 101 document requires the four size lists and the features `unbalancedMode`, `balancedMode`, `distinctBalancedAddresses` and `unbalancedCommonAddress`.
+- `schemas/client-result.schema.json`: the `generic`, `disturbances` and `disturbance` parts of IEC 103 results.
+- `fixtures/schema/iec60870-5-103-fixture.schema.json`: the optional `generic` entries and `disturbances` records; `scripts/validate-fixtures.py` checks them (unique GIN, value of the declared type and size; unique FAN, tags in order with the initial states at position 0, channels in ascending ACC with one NOE). `schemaVersion` stays `"1.0"`: the parts are optional, so every fixture of 1.0 is still valid.
+- `scripts/interop-iec103.sh`: the value checks of contract 2.3 (generic read and write, disturbance list, transfer and values).
+- `scripts/check-versions.sh`: the pins of `iec101-digitalpetri` (version, revision, Maven and JRE digests, gson and slf4j), and that both stages of its Dockerfile pin the same revision.
+
+### Verified
+
+See docs/COMPATIBILITY.md (IEC 60870-5-101 and IEC 60870-5-103). Locally on linux/arm64 (Docker on macOS), 2026-11-11. Nothing ran on amd64 or in CI.
+
+- IEC 101, contract 2.3, three stacks: smoke 48 pass per image and link mode; cross-stack unbalanced 1064 pass, 0 fail, 45 unsupported; balanced 913 pass, 0 fail, 64 known-difference (cbsigma client against digitalpetri server).
+- IEC 103, contract 2.3: smoke 53 (vitusdong), 34 each (goiecp5, ariec103, open103); cross-stack 36 pass, 0 fail, 45 known-difference, 39 unsupported. The generic and disturbance-list cases pass only for vitusdong against itself, which is not evidence; no harness server serves the fixture's disturbance values.
+
+---
+
 ## v0.3.0
 
 **Date:** 2026-11-11
@@ -55,7 +88,7 @@ Locally on linux/arm64 (Docker on macOS), 2026-11-11: smoke of `iec102-gisce` ag
 
 ## v0.2.0
 
-**Date:** not released (prepared 2026-11-11)
+**Date:** 2026-11-11
 **Previous release:** v0.1.0
 
 ### Added

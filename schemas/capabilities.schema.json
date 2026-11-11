@@ -65,12 +65,20 @@
       }
     },
     "linkAddressSizes": {
-      "description": "IEC 102: the sizes of the link address field (--link-address-size) the image supports.",
+      "description": "IEC 101 and 102: the sizes of the link address field (--link-address-size) the image supports; 0 (no field, balanced only) for IEC 101 only.",
+      "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": [0, 1, 2] }
+    },
+    "cotSizes": {
+      "description": "IEC 101 (contract 2.3): the sizes of the cause of transmission (--cot-size) the image supports.",
       "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": [1, 2] }
     },
     "caSizes": {
-      "description": "IEC 102: the sizes of the common address (--ca-size) the image supports.",
+      "description": "IEC 101 and 102: the sizes of the common address (--ca-size) the image supports.",
       "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": [1, 2] }
+    },
+    "ioaSizes": {
+      "description": "IEC 101 (contract 2.3): the sizes of the information object address (--ioa-size) the image supports.",
+      "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": [1, 2, 3] }
     },
     "profiles": {
       "description": "IEC 102: the profiles (--profile) the image supports.",
@@ -81,6 +89,19 @@
     {
       "if": { "properties": { "standard": { "const": "iec60870-5-103" } } },
       "then": { "required": ["transport", "linkModes", "asduTypes"] }
+    },
+    {
+      "if": { "properties": { "standard": { "const": "iec60870-5-101" } } },
+      "then": {
+        "required": ["transport", "linkModes", "linkAddressSizes", "cotSizes", "caSizes", "ioaSizes"],
+        "properties": {
+          "features": { "required": ["unbalancedMode", "balancedMode", "distinctBalancedAddresses", "unbalancedCommonAddress"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "standard": { "const": "iec60870-5-102" } } },
+      "then": { "properties": { "linkAddressSizes": { "items": { "enum": [1, 2] } } } }
     },
     {
       "if": { "properties": { "standard": { "const": "iec60870-5-102" } } },

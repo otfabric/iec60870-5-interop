@@ -67,7 +67,10 @@ for adapter in "${ADAPTERS[@]}"; do
     implementation "${STANDARD}-${adapter}" "${WORK}/caps-${adapter}.json"
     while IFS=$'\t' read -r bug_adapter bug_version bug_regex bug_text bug_id bug_url; do
         [[ -z "${bug_adapter}" || "${bug_adapter}" == \#* ]] && continue
-        if [[ "${bug_adapter}" == "${adapter}" && "${bug_version}" == "${version}" ]]; then
+        if [[ "${bug_adapter%@*}" == "${adapter}" && "${bug_version}" == "${version}" ]]; then
+            if [[ "${bug_regex}" == *--link-mode* && "${bug_regex}" != *"--link-mode ${LINK_MODE:-none}"* ]]; then
+                continue
+            fi
             printf '%s\t%s\t%s\t%s\t%s\n' "${bug_adapter}" "${bug_regex}" "${bug_text}" "${bug_id}" "${bug_url}" >> "${WORK}/active"
             log "known bug in ${adapter} ${version}: ${bug_text}"
         fi
@@ -94,18 +97,77 @@ supported() {
     return 0
 }
 
+# IEC 101 (contract 2.3): the field sizes of a case. link_flags <operation...>
+# prints the link flags of the operation, which the server of the case gets
+# too: both ends of a line are configured alike.
+link_flags() {
+    local out=() i args=("$@")
+    [[ "${STANDARD}" == iec101 ]] || return 0
+    for ((i = 0; i < ${#args[@]}; i++)); do
+        case "${args[i]}" in
+            --link-address|--link-address-size|--cot-size|--ca-size|--ioa-size)
+                out+=("${args[i]}" "${args[i + 1]:-}"); i=$((i + 1)) ;;
+        esac
+    done
+    echo "${out[*]:-}"
+}
+
+# flag_value <flag> <default> <operation...>: the value of a flag of the operation.
+flag_value() {
+    local flag="$1" def="$2" i; shift 2
+    local args=("$@")
+    for ((i = 0; i < ${#args[@]}; i++)); do
+        [[ "${args[i]}" == "${flag}" ]] && { echo "${args[i + 1]:-}"; return 0; }
+    done
+    echo "${def}"
+}
+
+# sizes_supported <client> <server> <operation...>: both images list every
+# field size of the operation (a link address size of 0 only in balanced
+# mode), and an unbalanced client without unbalancedCommonAddress is asked
+# for no request whose common address is not the link address.
+sizes_supported() {
+    local client="$1" server="$2"; shift 2
+    [[ "${STANDARD}" == iec101 ]] || return 0
+    local f flag key def size ca la a
+    for f in --link-address-size:linkAddressSizes:1 --cot-size:cotSizes:1 --ca-size:caSizes:1 --ioa-size:ioaSizes:2; do
+        IFS=: read -r flag key def <<<"${f}"
+        size=$(flag_value "${flag}" "${def}" "$@")
+        [[ "${flag}" == --link-address-size && "${size}" == 0 && "${LINK_MODE}" != balanced ]] && return 1
+        for a in "${client}" "${server}"; do
+            # An image of contract 2.2 lists no sizes: it takes the defaults only.
+            if jq -e --arg k "${key}" 'has($k)' "${WORK}/caps-${a}.json" >/dev/null 2>&1; then
+                jq -e --arg k "${key}" --argjson v "${size}" '.[$k] | index($v) != null' "${WORK}/caps-${a}.json" >/dev/null 2>&1 || return 1
+            elif [[ "${size}" != "${def}" ]]; then
+                return 1
+            fi
+        done
+    done
+    if [[ "${LINK_MODE}" == unbalanced && "$1" != connect && "$1" != monitor ]] && ! has "${client}" unbalancedCommonAddress; then
+        ca=$(flag_value --common-address 1 "$@"); la=$(flag_value --link-address 1 "$@")
+        [[ "${ca}" == "${la}" ]] || return 1
+    fi
+    return 0
+}
+
 SKIPPED=0
 skip() { SKIPPED=$((SKIPPED + 1)); result unsupported "$*"; [[ -n "${VERBOSE:-}" ]] && log "skip: $*"; return 0; }
 
 # known_bug <client> <server> <operation>: prints the description of a known
-# bug that may affect this pairing and operation, if there is one. The
+# bug that may affect this pairing and operation, if there is one. An entry
+# for "<adapter>@server" or "<adapter>@client" applies to that role only. For a
+# serial standard the regex is matched against the operation followed by
+# " --link-mode <mode of the run>". The
 # client's entries come first: its request is the first frame of the
 # exchange, so its deviation is the first one the operation meets.
 known_bug() {
-    local bug_adapter bug_regex bug_text bug_id who
-    for who in "$1" "$2"; do
+    local bug_adapter bug_regex bug_text bug_id who role op="$3"
+    serial_standard && op="${op} --link-mode ${LINK_MODE}"
+    for who in "$1@client" "$2@server"; do
         while IFS=$'\t' read -r bug_adapter bug_regex bug_text bug_id _; do
-            if [[ "${bug_adapter}" == "${who}" ]] && [[ "$3" =~ ${bug_regex} ]]; then
+            role="${who#*@}"
+            [[ "${bug_adapter}" == *@* ]] || bug_adapter="${bug_adapter}@${role}"
+            if [[ "${bug_adapter}" == "${who}" ]] && [[ "${op}" =~ ${bug_regex} ]]; then
                 printf '%s\t%s\n' "${bug_id}" "${bug_text}"
                 return 0
             fi
@@ -152,6 +214,8 @@ while IFS=$'\t' read -r case_id state want_exit want_summary needs operation; do
     [[ -z "${case_id}" || "${case_id}" == \#* ]] && continue
     n=$((n + 1))
     reference="" reference_pair=""
+    # shellcheck disable=SC2086
+    case_link=$(link_flags ${operation})
     for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
         for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
             pair="${client}->${server}"
@@ -160,8 +224,22 @@ while IFS=$'\t' read -r case_id state want_exit want_summary needs operation; do
                 skip "${pair}: ${operation} (needs ${needs})"
                 continue
             fi
+            # shellcheck disable=SC2086
+            if ! sizes_supported "${client}" "${server}" ${operation}; then
+                skip "${pair}: ${operation} (field sizes or common address the pairing does not declare)"
+                continue
+            fi
             if [[ "${state}" == "rw" ]]; then
-                name=$(start_server "${server}"); wait_ready "${name}" || exit 1
+                # shellcheck disable=SC2086
+                name=$(start_server "${server}" ${case_link}); wait_ready "${name}" || exit 1
+            elif [[ -n "${case_link}" ]]; then
+                # One shared server per adapter and set of link flags.
+                name=$(SERVER_TAG="l$(cksum <<<"${case_link}" | cut -d' ' -f1)" server_name "${server}")
+                if ! docker inspect "${name}" >/dev/null 2>&1; then
+                    # shellcheck disable=SC2086
+                    name=$(SERVER_TAG="l$(cksum <<<"${case_link}" | cut -d' ' -f1)" start_server "${server}" ${case_link})
+                    wait_ready "${name}" || exit 1
+                fi
             else
                 name=$(shared_server "${server}")
             fi
@@ -217,10 +295,12 @@ for server in "${ADAPTERS[@]}"; do
         at_pair values.interrogation "${client}" "${server}"
         got=$(run_client "${client}" interrogate --host "${name}" | jq -cS --argjson cot 20 "${got_points}")
         if [[ "${got}" == "${want_points}" ]]; then ok "${pair}: interrogation matches the fixture"
+        elif bug=$(known_bug "${client}" "${server}" "interrogate"); then hit_known_bug "${pair}" "interrogation" "${bug}"
         else fail "${pair}: interrogation does not match the fixture"; log "    want ${want_points}"; log "    got  ${got}"; fi
         at_pair values.counter-interrogation "${client}" "${server}"
         got=$(run_client "${client}" counter-interrogate --host "${name}" | jq -cS --argjson cot 37 "${got_points}")
         if [[ "${got}" == "${want_counters}" ]]; then ok "${pair}: counter interrogation matches the fixture"
+        elif bug=$(known_bug "${client}" "${server}" "counter-interrogate"); then hit_known_bug "${pair}" "counter interrogation" "${bug}"
         else fail "${pair}: counter interrogation does not match the fixture"; log "    want ${want_counters}"; log "    got  ${got}"; fi
     done
 done
@@ -235,6 +315,7 @@ for server in "${ADAPTERS[@]}"; do
         report=$(run_client "${client}" command --type C_SE_NC_1 --ioa 502 --value 49.5 --host "${name}" \
             | jq -c '[.asdus[] | select(.type == "M_ME_TF_1") | {cot, ioa: .objects[0].ioa, value: .objects[0].value, timed: (.objects[0].time != null)}]')
         if [[ "${report}" == '[{"cot":11,"ioa":202,"value":49.5,"timed":true}]' ]]; then ok "${pair}: set point is reported"
+        elif bug=$(known_bug "${client}" "${server}" "command --type C_SE_NC_1"); then hit_known_bug "${pair}" "set point report" "${bug}"
         else fail "${pair}: set point report is ${report}"; fi
         at_pair values.set-point-read-back "${client}" "${server}"
         after=$(run_client "${client}" read --ioa 202 --host "${name}" | jq -c --argjson ioa 202 "${value_of}")
@@ -245,6 +326,7 @@ for server in "${ADAPTERS[@]}"; do
         run_client "${client}" command --type C_SC_NA_1 --ioa 500 --value false --host "${name}" >/dev/null
         after=$(run_client "${client}" interrogate --host "${name}" | jq -c --argjson ioa 100 "${value_of}")
         if [[ "${after}" == "false" ]]; then ok "${pair}: single command is visible to a later interrogation"
+        elif bug=$(known_bug "${client}" "${server}" "interrogate"); then hit_known_bug "${pair}" "interrogation after single command" "${bug}"
         else fail "${pair}: interrogation after single command returns ${after}"; fi
         stop_server "${name}"
     done
@@ -262,10 +344,12 @@ if serial_standard; then
             at_pair session.idle-hold "${client}" "${server}"
             doc=$(run_client "${client}" connect --hold-ms 3000 --host "${name}")
             if jq -e '.ok and .connected' <<<"${doc}" >/dev/null 2>&1; then ok "${pair}: idle line stays up for 3 s"
+            elif bug=$(known_bug "${client}" "${server}" "connect"); then hit_known_bug "${pair}" "idle line" "${bug}"
             else fail "${pair}: idle line: $(jq -r "${SUMMARY}" <<<"${doc}" 2>/dev/null)"; fi
             at_pair session.after-idle "${client}" "${server}"
             got=$(run_client "${client}" interrogate --host "${name}" | jq -cS --argjson cot 20 "${got_points}")
             if [[ "${got}" == "${want_points}" ]]; then ok "${pair}: interrogation on the next connection"
+            elif bug=$(known_bug "${client}" "${server}" "interrogate"); then hit_known_bug "${pair}" "interrogation after an idle connection" "${bug}"
             else fail "${pair}: interrogation after an idle connection returned ${got}"; fi
         done
     done

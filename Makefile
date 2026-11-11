@@ -33,7 +33,7 @@ BUILDER ?= iec60870-5-interop
 
 # Adapters per standard, in priority order. Override to work on one:
 #   make smoke-iec101 IEC101_ADAPTERS=cbsigma
-IEC101_ADAPTERS ?= lib60870 cbsigma
+IEC101_ADAPTERS ?= lib60870 cbsigma digitalpetri
 IEC104_ADAPTERS ?= lib60870 openmuc wendy512 cbsigma part5
 # IEC 103: vitusdong has both roles; the others are clients (control systems).
 IEC103_ADAPTERS ?= vitusdong goiecp5 ariec103 open103

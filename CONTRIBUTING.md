@@ -24,7 +24,7 @@ Run `make` for all targets.
 3. `make interop`: the result documents of all pairings must stay identical. If two stacks disagree, find out which one is right by the standard before touching the expectation.
 4. If behaviour visible to consumers changed, update the contract or fixture documentation in the same change.
 
-Adapter sources link GPL-3.0 libraries: keep the `SPDX-License-Identifier: GPL-3.0-or-later` header.
+Adapter sources link GPL-3.0 libraries: keep the `SPDX-License-Identifier: GPL-3.0-or-later` header (except `adapters/iec101/digitalpetri/`, EPL-2.0 like the library it links: keep `SPDX-License-Identifier: EPL-2.0` there; THIRD_PARTY_NOTICES.md).
 
 ## Moving an upstream pin
 
@@ -77,4 +77,4 @@ Do not build a shared adapter framework. The adapters share a contract, not code
 
 ## License
 
-By contributing you agree that your contributions are licensed as the part of the repository they touch: MIT, or GPL-3.0-or-later under `adapters/`.
+By contributing you agree that your contributions are licensed as the part of the repository they touch: MIT, or GPL-3.0-or-later under `adapters/` (except `adapters/iec101/digitalpetri/`, EPL-2.0; THIRD_PARTY_NOTICES.md).

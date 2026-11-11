@@ -1,0 +1,1 @@
+{"adapter":"cbsigma","asdus":[],"confirmations":[],"connected":true,"elapsedMs":2015,"error":{"code":"connection-lost","message":"connection closed while waiting for confirmation 1"},"ok":false,"operation":"counter-interrogate","schemaVersion":"1.0","terminated":false}

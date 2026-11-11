@@ -14,9 +14,9 @@ the reason.
 
 | Stack | Licence | Roles / modes | Transport | Verdict |
 |---|---|---|---|---|
-| [mz-automation/lib60870](https://github.com/mz-automation/lib60870) C, v2.4.1 `7a388e3e` | GPL-3.0 (or commercial) | master + slave, balanced + unbalanced | serial (termios HAL) only | **yes, with adapter work**: C driver + socat pty bridge (pattern proven by cB-Sigma `interop/peer` and digitalpetri `docker/lib60870c`). Issue #204: Linux master drops frames slower than its 300 ms character timeout (long frames below 9600 Bd); a pty bridge avoids it. |
-| [digitalpetri/iec60870](https://github.com/digitalpetri/iec60870) Java 17, `33e52b3` (0.1.0-SNAPSHOT) | EPL-2.0 | balanced, unbalanced master, unbalanced slave | serial (jSerialComm) and native 101-over-TCP | **yes, with adapter work**: strongest independent 101 peer; small Java CLI from a pinned SHA |
-| [cB-Sigma/iec60870](https://github.com/cB-Sigma/iec60870) Go, v0.3.0 `d0cad7ab` | Apache-2.0 | controlling + controlled, balanced + unbalanced, shared line | any io.ReadWriteCloser | **yes, with adapter work**, as third peer: debugged against lib60870, so not independent evidence on its own |
+| [mz-automation/lib60870](https://github.com/mz-automation/lib60870) C, v2.4.1 `7a388e3e` | GPL-3.0 (or commercial) | master + slave, balanced + unbalanced | serial (termios HAL) only | **adapter `iec101-lib60870`, validated**: C driver + socat pty bridge (pattern proven by cB-Sigma `interop/peer` and digitalpetri `docker/lib60870c`). Issue #204: Linux master drops frames slower than its 300 ms character timeout (long frames below 9600 Bd); a pty bridge avoids it. |
+| [digitalpetri/iec60870](https://github.com/digitalpetri/iec60870) Java 17, `33e52b3` (0.1.0-SNAPSHOT) | EPL-2.0 | balanced, unbalanced master, unbalanced slave | serial (jSerialComm) and native 101-over-TCP | **adapter `iec101-digitalpetri`** (contract 2.3, validated): its TcpIec101Client and TcpIec101Server built from the pinned commit; every field size (link address 0..2, COT 1..2, CA 1..2, IOA 1..3). Its unbalanced master sends an ASDU to the station whose link address equals the common address (`unbalancedCommonAddress` false). Known bug: its balanced station sends user data without resetting the other link first (`digitalpetri-balanced-server-no-link-reset`, COMPATIBILITY.md). EPL-2.0 without a Secondary License: the adapter is EPL-2.0 |
+| [cB-Sigma/iec60870](https://github.com/cB-Sigma/iec60870) Go, v0.3.0 `d0cad7ab` | Apache-2.0 | controlling + controlled, balanced + unbalanced, shared line | any io.ReadWriteCloser | **adapter `iec101-cbsigma`, validated**; second peer, debugged against lib60870, so not independent evidence on its own |
 | mz-automation/lib60870.NET `4ad2923d` | GPL-3.0 | master + slave | serial, TCP | no: same vendor and design as lib60870-C |
 | dscsystems/rs-iec60870-5 Rust `8f3274e` | DSC Source-Available 1.0 | 101 primary/secondary, 103 master | serial, TCP | CI-built private peer only: licence forbids binary redistribution |
 | FreyrSCADA/IEC-60870-5-101 | proprietary eval SDK | | | no |
@@ -78,6 +78,24 @@ standard in the ways listed; the server role has four independent clients
 the standard. No open stack offers a standard-conforming IEC 103 secondary
 station; the ARIEC103 simulator is the second independent server on the wire
 but not fixture-driven ([ROADMAP.md](ROADMAP.md)).
+
+Generic services (ASDU 10, 11, 21) and disturbance data (ASDU 23 to 31),
+read again in the pinned sources for contract 2.3 (2026-11-11; file and line
+references in [CAPABILITIES.md](CAPABILITIES.md#features-of-the-iec-103-images)):
+
+| Stack | Generic services | Disturbance data |
+|-------|------------------|------------------|
+| vitusdong | master and slave (read of entries, write; every generic ASDU with INF 0) | master (list, a procedure of its own that is not clause 7.4.7's, tags separately) and slave (list, records with generated values and the station's indications as tags) |
+| ARIEC103 | no | no (type 23 named in its decoder only) |
+| Open103 | no (`GenericService()` returns false) | master: the procedure of clause 7.4.7 driven by the ASDU 23 the station sends, after the GI; NFE of ASDU 30 read through an unpacked struct (known bug); `DisturbanceData` lacks a return for most types (undefined behaviour the shim avoids) |
+| go-iecp5 cs103 | no (type identifications only) | no ("not implemented by this package") |
+
+vitusdong and ARIEC103 are not independent of each other (vitusdong's tests
+use a copy of ArIEC103 as their oracle), but ARIEC103 has neither function,
+so that does not touch the evidence of contract 2.3. Open103, judged usable
+only in part for the basic functions, is usable for the transmission of
+disturbance data as a control system: it ran the whole procedure against an
+independent protection equipment (the consumer run in COMPATIBILITY.md).
 
 ## Passive decoding oracle
 

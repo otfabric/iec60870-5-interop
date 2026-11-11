@@ -13,10 +13,22 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <chrono>
+#include <fstream>
+#include <iomanip>
 #include <vector>
 
+// The handlers of the transmission of disturbance data (DisturbanceRequest,
+// DisturbanceTransfer, ...) are private; the public DisturbanceData that
+// dispatches to them flows off its end without a return for the types 23 to
+// 30, undefined behaviour that GCC compiles to a trap or a jump. The shim
+// therefore makes the class's members visible and dispatches as
+// DisturbanceData does (o103_disturbance below). The standard headers are
+// included above, so only Open103's own headers see the definition.
+#define private public
 #include "IEC8705103Manager.h"
+#undef private
 
 namespace {
 
@@ -227,6 +239,91 @@ int o103_frames(void *h, unsigned char *out, int outlen) {
     n += static_cast<int>(f.size());
   }
   return n;
+}
+
+// Hands one received ASDU of the transmission of disturbance data (types 23
+// to 31) to IEC8705103Manager's handler for its type, as DisturbanceData
+// dispatches them; the handler sends the next order or acknowledgement
+// itself. Returns 1 when the ASDU 31 ended the whole disturbance data and
+// was acknowledged positively (TOO 64), 0 for any other ASDU, -1 out of
+// time. The handlers read their fixed layouts past the end of a short ASDU,
+// so the ASDU is handed over in a zeroed buffer of the largest frame.
+int o103_disturbance(void *h, const unsigned char *asdu, int len, int budgetMs) {
+  auto *s = static_cast<Session *>(h);
+  unsigned char buf[512] = {0};
+  std::memcpy(buf, asdu, static_cast<size_t>(std::min(len, 255)));
+  return call(s, budgetMs, [&] {
+    IEC8705103Manager *m = s->manager;
+    switch (buf[0]) {
+      case 23:
+        m->DisturbanceRequest(buf);
+        return false;
+      case 26:
+        m->DisturbanceTransfer(buf);
+        return false;
+      case 27:
+        m->DisturbanceChannel(buf);
+        return false;
+      case 28:
+        m->DisturbanceTags(buf);
+        return false;
+      case 29:
+        m->DisturbanceTagsGet(buf);
+        return false;
+      case 30:
+        m->DisturbanceChannelGet(buf);
+        return false;
+      case 31:
+        return m->DisturbanceEnd(buf);
+      default:
+        return false;
+    }
+  });
+}
+
+// What IEC8705103Manager holds of the last disturbance (GetDisturbanceData):
+// FaultNumber, SamplingTime, the channel count and elements per channel,
+// and the time of day of the first value.
+void o103_disturbance_head(void *h, int *out) {
+  const auto &d = static_cast<Session *>(h)->manager->GetDisturbanceData();
+  out[0] = d.FaultNumber;
+  out[1] = d.SamplingTime;
+  out[2] = d.ChannelList.Count;
+  out[3] = d.ChannelList.ChannelElements;
+  out[4] = d.startTime.GetMilliseconds();
+  out[5] = d.startTime.GetMinutes();
+  out[6] = d.startTime.GetHours();
+  out[7] = d.TagsList.TagsCount;
+}
+
+// The tags of ASDU 29 number i as Open103 stored them: TAP, then FUN, INF,
+// DPI per tag. Returns the number of tags (NOT).
+int o103_disturbance_tags(void *h, int i, int *out, int max) {
+  const auto &d = static_cast<Session *>(h)->manager->GetDisturbanceData();
+  if (i < 0 || i >= d.TagsList.TagsCount || i >= MAX_DIST_COUNT) return 0;
+  const auto &t = d.TagsList.TagsHeader[i];
+  out[0] = t.TAP;
+  int n = std::min<int>(t.NOT, (max - 1) / 3);
+  for (int k = 0; k < n; k++) {
+    out[1 + 3 * k] = t.TagsValue[k].FType;
+    out[2 + 3 * k] = t.TagsValue[k].In;
+    out[3 + 3 * k] = t.TagsValue[k].DIP;
+  }
+  return n;
+}
+
+// Channel acc as Open103 stored it: RPV, RSV, RFA and its first n values
+// (SDV, indexed by the value number Open103 computed). Returns the ACC of
+// the last ASDU 30 stored for it (0: none).
+int o103_disturbance_channel(void *h, int acc, float *ratings, int *values, int n) {
+  const auto &d = static_cast<Session *>(h)->manager->GetDisturbanceData();
+  if (acc < 0 || acc >= MAX_DIST_COUNT) return 0;
+  const auto &c = d.ChannelList.Channels[acc];
+  ratings[0] = c.RPV;
+  ratings[1] = c.RSV;
+  ratings[2] = c.RFA;
+  for (int k = 0; k < n && k < MAX_SDV_COUNT; k++) values[k] = c.SDV[k];
+  return c.Header.ACC;
 }
 
 void o103_close(void *h) {

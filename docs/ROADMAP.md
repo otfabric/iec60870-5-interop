@@ -1,18 +1,18 @@
 # Roadmap
 
 What exists is in [COMPATIBILITY.md](COMPATIBILITY.md); candidates are
-assessed in [REFERENCE_STACKS.md](REFERENCE_STACKS.md). Nothing here is done.
+assessed in [REFERENCE_STACKS.md](REFERENCE_STACKS.md). Items marked done
+are kept for reference.
 
 ## IEC 60870-5-101
 
-1. **digitalpetri/iec60870** (Java 17, EPL-2.0, native 101-over-TCP) as a third
-   adapter, pinned by full SHA. cB-Sigma's IEC 101 link was debugged against
-   lib60870-C, so the two validated adapters are not fully independent
-   evidence; digitalpetri is the strongest independent peer of the survey.
-2. More cases: interrogation groups (an IEC 101 `extended` fixture), field
-   sizes other than the defaults in the cross-stack run (today only the smoke
-   test exercises 2/2/2/3 per adapter), `--link-address-size 0` in balanced
-   mode, distinct balanced addresses between stacks that support them.
+1. Done in 0.4.0: digitalpetri/iec60870 as the third adapter, and the
+   field sizes in the cross-stack run (contract 2.3: 2/2/2/3, 1/2/1/3,
+   2/1/2/2 and, balanced, no link address field).
+2. More cases: interrogation groups (an IEC 101 `extended` fixture), a
+   one-octet information object address (needs a fixture whose addresses fit
+   it), distinct balanced addresses between stacks that support them
+   (lib60870 only so far).
 3. Captures: a `tshark -d tcp.port==2401,iec60870_101` decode of each pairing
    as a passive check of the frames.
 
@@ -36,17 +36,24 @@ meter. Next:
 Contract 2.1 has the IEC 103 images (vitusdong server and client; goiecp5,
 ariec103, open103 clients). Next:
 
-1. **A second fixture-driven server.** The only one, vitusdong, deviates from
+1. Done in 0.4.0: **generic services and disturbance data** (contract 2.3,
+   ASDU 10/21 and 23..31): operations `generic-read`, `generic-write`,
+   `disturbance-list` and `disturbance-transfer`, a `generic` and a
+   `disturbances` part of the fixture, 7 cases. Only vitusdong has a server
+   for them, so inside the harness they run as one self-pairing
+   (COMPATIBILITY.md).
+2. **A second fixture-driven server.** The only one, vitusdong, deviates from
    the standard in every reply the cases check (tests/iec103/known-bugs.tsv),
    so the expectations of `tests/iec103/cases.tsv` are the contract's and no
    reference server meets them yet. Candidates: the ArIEC103 slave simulator
    behind a fixture (its model is fixed in code, so this needs a change
    upstream or a different simulator); dscsystems/rs-iec60870-5 has no
    secondary.
-3. **Generic services and disturbance data** (ASDU 10/11/21, 23..31):
-   operations `generic-read` and `disturbance-list`/`disturbance-get`, a
-   `generic` and a `disturbances` part of the fixture. Only vitusdong has both
-   roles for them, so the first run would be one pairing.
+3. **More of generic services and disturbance data:** a server that serves
+   the fixture's disturbance values (`disturbanceDataServer`; vitusdong
+   cannot), generic reads by heading, group or directory (INF 240, 241,
+   243), the general interrogation of generic data, writes with confirmation
+   or abort, and aborts of a disturbance transfer or more than one record.
 4. Broadcast clock synchronization: no client of the survey sends SEND/NO
    REPLY to address 255; the contract defines `--broadcast` for a consumer.
 5. Upstream reports of the known bugs (the maintainer files them).

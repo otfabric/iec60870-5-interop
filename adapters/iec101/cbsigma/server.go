@@ -126,6 +126,7 @@ func runServer(a *args) (int, error) {
 	ready["adapter"], ready["address"] = adapter, ln.Addr().String()
 	ready["fixture"], ready["commonAddress"] = fx.Name, fx.Station.CommonAddr
 	ready["standard"], ready["mode"], ready["linkAddress"] = standard, lc.modeName(), lc.address
+	ready["linkAddressSize"], ready["cotSize"], ready["caSize"], ready["ioaSize"] = lc.addrSize, lc.cotSize, lc.caSize, lc.ioaSize
 	emit(ready)
 
 	sig := make(chan os.Signal, 1)

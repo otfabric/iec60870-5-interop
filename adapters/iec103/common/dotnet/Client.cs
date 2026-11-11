@@ -48,7 +48,8 @@ public sealed class ConnectionLostException(string message) : Exception(message)
 
 public static class ClientRunner
 {
-    private static readonly string[] Operations = ["connect", "interrogate", "clock-sync", "command", "monitor"];
+    private static readonly string[] Operations =
+        ["connect", "interrogate", "clock-sync", "command", "monitor", "generic-read", "generic-write", "disturbance-list", "disturbance-transfer"];
 
     public static string Usage(string adapter) => $"""
         usage: iec60870-5-interop <command>
@@ -60,6 +61,10 @@ public static class ClientRunner
               clock-sync   [--time 2026-01-02T03:04:05.678Z]
               command      --fun N --inf N --dco 1|2|off|on [--rii N]
               monitor      [--duration-ms N] [--max-asdus N]
+              generic-read --gin G.E [--kod N]
+              generic-write --gin G.E [--kod N] --type 1|3|4|7 --size N --value V
+              disturbance-list [--fun N]
+              disturbance-transfer --fan N [--fun N]
           print-capabilities
           print-fixture [NAME]
           version
@@ -81,6 +86,9 @@ public static class ClientRunner
         public bool Terminated;
         public readonly List<Dictionary<string, object?>> Asdus = [];
         public readonly Stopwatch Clock = Stopwatch.StartNew();
+        public Dictionary<string, object?>? Generic;
+        public List<Dictionary<string, object?>>? Faults;
+        public Dictionary<string, object?>? Disturbance;
 
         public int Fail(string code, string message, int exit)
         {
@@ -90,13 +98,32 @@ public static class ClientRunner
             return exit;
         }
 
-        public void Emit(string adapter) => Out.Emit(new Dictionary<string, object?>
+        public void Emit(string adapter)
         {
-            ["schemaVersion"] = "1.0", ["adapter"] = adapter, ["operation"] = Operation, ["ok"] = Ok,
-            ["error"] = Ok ? null : new Dictionary<string, object?> { ["code"] = Code, ["message"] = Message },
-            ["connected"] = Connected, ["confirmations"] = Confirmations, ["terminated"] = Terminated,
-            ["asdus"] = Asdus, ["elapsedMs"] = Clock.ElapsedMilliseconds,
-        });
+            var doc = new Dictionary<string, object?>
+            {
+                ["schemaVersion"] = "1.0", ["adapter"] = adapter, ["operation"] = Operation, ["ok"] = Ok,
+                ["error"] = Ok ? null : new Dictionary<string, object?> { ["code"] = Code, ["message"] = Message },
+                ["connected"] = Connected, ["confirmations"] = Confirmations, ["terminated"] = Terminated,
+                ["asdus"] = Asdus, ["elapsedMs"] = Clock.ElapsedMilliseconds,
+            };
+            if (Generic is not null)
+            {
+                doc["generic"] = Generic;
+            }
+
+            if (Faults is not null)
+            {
+                doc["disturbances"] = Faults;
+            }
+
+            if (Disturbance is not null)
+            {
+                doc["disturbance"] = Disturbance;
+            }
+
+            Out.Emit(doc);
+        }
     }
 
     /// <summary>Runs "client &lt;operation&gt; ..." and returns the exit code.</summary>
@@ -116,6 +143,7 @@ public static class ClientRunner
         var collectMs = a.Range("--collect-ms", 0, 0, 3600000);
         var linkAddress = a.Link();
         int hold = 0, scn = 0, fun = 0, inf = 0, dco = 0, rii = 1, duration = 1000, maxAsdus = 0;
+        var svc = new ServiceArgs();
         var time = DateTime.UtcNow;
         switch (op)
         {
@@ -148,6 +176,37 @@ public static class ClientRunner
                 duration = a.Range("--duration-ms", 1000, 0, 3600000);
                 maxAsdus = a.Range("--max-asdus", 0, 0, 1000000);
                 break;
+            case "generic-read":
+            case "generic-write":
+                (svc.Group, svc.Entry) = GenericDoc.ParseGin(a.Str("--gin"));
+                svc.Kod = a.Range("--kod", 1, 0, 255);
+                if (op == "generic-write")
+                {
+                    svc.Type = a.Range("--type", -1, 0, 255);
+                    svc.Size = a.Range("--size", -1, 1, 255);
+                    if (svc.Type < 0 || svc.Size < 0)
+                    {
+                        throw new UsageException("generic-write: --type and --size are required");
+                    }
+
+                    svc.Value = a.Str("--value");
+                    _ = GenericDoc.ParseValue(svc.Type, svc.Size, svc.Value);
+                }
+
+                break;
+            case "disturbance-list":
+            case "disturbance-transfer":
+                svc.Fun = a.Range("--fun", -1, 0, 255);
+                if (op == "disturbance-transfer")
+                {
+                    svc.Fan = a.Range("--fan", -1, 1, 65535);
+                    if (svc.Fan < 0)
+                    {
+                        throw new UsageException("disturbance-transfer: --fan is required");
+                    }
+                }
+
+                break;
         }
 
         a.Finish("client " + op);
@@ -161,11 +220,16 @@ public static class ClientRunner
             throw new UsageException($"client {op}: {why}");
         }
 
+        if (svc.Fun >= 0 && unsupported("fun " + svc.Fun) is { } whyFun)
+        {
+            throw new UsageException($"client {op} --fun {svc.Fun}: {whyFun}");
+        }
+
         var r = new Result { Operation = op };
         int code;
         using (var link = makeLink())
         {
-            code = Execute(r, link, op, host, port, linkAddress, ca, timeoutMs, connectMs, collectMs, hold, scn, time, fun, inf, dco, rii, duration, maxAsdus);
+            code = Execute(r, link, op, host, port, linkAddress, ca, timeoutMs, connectMs, collectMs, hold, scn, time, fun, inf, dco, rii, duration, maxAsdus, svc);
         }
 
         r.Emit(adapter);
@@ -173,7 +237,7 @@ public static class ClientRunner
     }
 
     private static int Execute(Result r, ILink103 link, string op, string host, int port, int linkAddress, int ca, int timeoutMs, int connectMs,
-        int collectMs, int hold, int scn, DateTime time, int fun, int inf, int dco, int rii, int duration, int maxAsdus)
+        int collectMs, int hold, int scn, DateTime time, int fun, int inf, int dco, int rii, int duration, int maxAsdus, ServiceArgs svc)
     {
         try
         {
@@ -238,6 +302,12 @@ public static class ClientRunner
             for (var i = 0; acd && i < 64; i++)
             {
                 Take(link.Class1());
+            }
+
+            // ---- the generic services and disturbance data: the library's own procedures ----
+            if (op.StartsWith("generic-", StringComparison.Ordinal) || op.StartsWith("disturbance-", StringComparison.Ordinal))
+            {
+                return Service(r, link, op, ca, timeoutMs, svc);
             }
 
             // ---- the operation ----
@@ -371,6 +441,68 @@ public static class ClientRunner
         }
     }
 
+    /// <summary>The flags of the generic services and of the transmission of disturbance data.</summary>
+    private sealed class ServiceArgs
+    {
+        public int Group, Entry, Kod = 1, Type = -1, Size = -1, Fun = -1, Fan = -1;
+        public string? Value;
+    }
+
+    private static int Service(Result r, ILink103 link, string op, int ca, int timeoutMs, ServiceArgs svc)
+    {
+        void Received(byte[] asdu) => r.Asdus.Add(AsduDoc.Build(asdu));
+        try
+        {
+            switch (op)
+            {
+                case "generic-read":
+                case "generic-write":
+                {
+                    var g = (IGeneric103)link;
+                    var (cot, sets) = op == "generic-read"
+                        ? g.GenericRead(ca, svc.Group, svc.Entry, svc.Kod, timeoutMs, Received)
+                        : g.GenericWrite(ca, svc.Group, svc.Entry, svc.Kod, svc.Type, svc.Size, svc.Value!, timeoutMs, Received);
+                    r.Confirmations.Add(new() { ["cot"] = cot, ["negative"] = false });
+                    r.Generic = new() { ["cot"] = cot, ["sets"] = sets };
+                    break;
+                }
+                case "disturbance-list":
+                    r.Faults = ((IDisturbance103)link).DisturbanceList(ca, svc.Fun, timeoutMs, Received);
+                    break;
+                case "disturbance-transfer":
+                    r.Disturbance = ((IDisturbance103)link).DisturbanceTransfer(ca, svc.Fun, svc.Fan, timeoutMs, Received);
+                    break;
+            }
+        }
+        catch (NegativeAnswerException e)
+        {
+            r.Confirmations.Add(new() { ["cot"] = e.Cot, ["negative"] = true });
+            r.Generic = new() { ["cot"] = e.Cot, ["sets"] = e.Sets };
+            return r.Fail("negative-confirmation", e.Message, Exit.Failed);
+        }
+        catch (TimeoutException e)
+        {
+            return r.Fail("timeout", e.Message, Exit.Failed);
+        }
+        catch (NotSentException e)
+        {
+            return r.Fail("failed", e.Message, Exit.Failed);
+        }
+        catch (Exception e) when (e is FormatException or InvalidOperationException or ArgumentException or IndexOutOfRangeException)
+        {
+            // The library gave up on what the station sent.
+            return r.Fail("failed", $"{e.GetType().Name}: {e.Message}", Exit.Failed);
+        }
+
+        if (!link.Connected)
+        {
+            return r.Fail("connection-lost", "the station closed the connection", Exit.Failed);
+        }
+
+        r.Ok = true;
+        return Exit.Ok;
+    }
+
     public static int PrintFixture(string name)
     {
         if (name.IndexOfAny(['/', '\\']) >= 0 || name.Contains(".."))
@@ -393,7 +525,8 @@ public static class ClientRunner
     }
 
     /// <summary>The features of a capability document, with the IEC 101/104 ones false.</summary>
-    public static Dictionary<string, object?> Features(bool gi, bool clockSync, bool command, bool ident, bool measurands, bool broadcast) => new()
+    public static Dictionary<string, object?> Features(bool gi, bool clockSync, bool command, bool ident, bool measurands, bool broadcast,
+        bool generic = false, bool disturbanceList = false, bool disturbanceData = false, bool disturbanceDataServer = false) => new()
     {
         ["generalInterrogation"] = gi, ["groupInterrogation"] = false, ["counterInterrogation"] = false, ["read"] = false,
         ["clockSync"] = clockSync, ["testCommand"] = false, ["directCommands"] = command, ["selectBeforeOperate"] = false,
@@ -405,6 +538,7 @@ public static class ClientRunner
         ["redundancyServer"] = false, ["redundancyClient"] = false, ["secureAuthentication"] = false,
         ["unbalancedMode"] = true, ["balancedMode"] = false, ["distinctBalancedAddresses"] = false,
         ["generalCommand"] = command, ["identification"] = ident, ["measurands"] = measurands,
-        ["broadcastClockSync"] = broadcast, ["genericServices"] = false, ["disturbanceData"] = false,
+        ["broadcastClockSync"] = broadcast, ["genericServices"] = generic, ["disturbanceList"] = disturbanceList,
+        ["disturbanceData"] = disturbanceData, ["disturbanceDataServer"] = disturbanceDataServer,
     };
 }

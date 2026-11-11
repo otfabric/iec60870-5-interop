@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","adapter":"digitalpetri","operation":"read","ok":true,"error":null,"connected":true,"confirmations":[],"terminated":false,"asdus":[{"type":"M_SP_NA_1","typeId":1,"cot":5,"negative":false,"test":false,"originator":0,"commonAddress":1,"sequence":false,"count":1,"objects":[{"ioa":100,"value":true,"quality":[]}]}],"elapsedMs":232}

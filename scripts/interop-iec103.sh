@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# The checks on values and sessions of IEC 103 (contract 2.1), for every
+# The checks on values and sessions of IEC 103 (contract 2.3), for every
 # client with every server. Sourced by scripts/interop.sh after the cases; do
 # not execute.
 #
@@ -92,6 +92,89 @@ for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
         value_check values.measurands "${client}" "${server}" "monitor measurands" \
             "$(jq -cS '[.asdus[] | select(.cot == 2 and (.typeId == 3 or .typeId == 9)) | .typeId as $t | .objects[0] | {type: $t, fun, inf, values}] | unique_by(.fun, .inf) | sort_by(.fun, .inf)' <<<"${doc}" 2>/dev/null)" \
             "${want_meas}" "the measurands of the fixture arrive as class 2 data"
+    done
+done
+
+# ---- values (contract 2.3): generic data of the fixture ----
+# Clause 7.4.8.6.2: a read of attribute KOD 1 (actual value) of each entry
+# answers its GDD (type, size, NUMBER 1) and value; KOD 10 its description.
+want_gen=$(jq -cS '[.generic[]? | {gin: "\(.gin.group).\(.gin.entry)", kod: 1, type, size, number: 1, values: [.value]},
+    {gin: "\(.gin.group).\(.gin.entry)", kod: 10, type: 1, size: (.description | length), number: 1, values: [.description]}]' "${FIXTURE}")
+for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
+    name=$(shared_server "${server}")
+    for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        if ! supported "${client}" "${server}" "server:genericServices,client:genericServices"; then
+            at_pair values.generic-read "${client}" "${server}"; skip "${client}->${server}: generic read"; continue
+        fi
+        got='[]'
+        while read -r gin; do
+            for kod in 1 10; do
+                doc=$(run_client "${client}" generic-read --gin "${gin}" --kod "${kod}" --host "${name}")
+                keep "iec103-values-generic-read-${gin}-${kod}-${client}->${server}" "${doc}"
+                got=$(jq -cS --argjson d "$(jq -c '.generic.sets // []' <<<"${doc}" 2>/dev/null || echo '[]')" '. + $d' <<<"${got}")
+            done
+        done < <(jq -r '.generic[]? | "\(.gin.group).\(.gin.entry)"' "${FIXTURE}")
+        value_check values.generic-read "${client}" "${server}" "generic-read" "${got}" "${want_gen}" \
+            "generic reads return the fixture's values and descriptions"
+    done
+done
+
+# Clause 7.4.8.6.3: a write with execution (INF 250) to a writable entry is
+# acknowledged with cause 40 and a later read returns the new value.
+for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
+    for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        if ! supported "${client}" "${server}" "server:genericServices,client:genericServices"; then
+            at_pair values.generic-write "${client}" "${server}"; skip "${client}->${server}: generic write"; continue
+        fi
+        name=$(start_server "${server}"); wait_ready "${name}" || exit 1
+        doc=$(run_client "${client}" generic-write --gin 1.2 --type 7 --size 4 --value 2.25 --host "${name}")
+        keep "iec103-values-generic-write-${client}->${server}" "${doc}"
+        after=$(run_client "${client}" generic-read --gin 1.2 --host "${name}" | jq -c '[.generic.sets[]?.values[]?]' 2>/dev/null)
+        value_check values.generic-write "${client}" "${server}" "generic-write" \
+            "$(jq -c '[.confirmations[] | .cot]' <<<"${doc}" 2>/dev/null) ${after}" "[40] [2.25]" \
+            "a write with execution is acknowledged with cause 40 and visible to a later read"
+        stop_server "${name}"
+    done
+done
+
+# ---- values (contract 2.3): the recorded disturbance of the fixture ----
+# Clause 7.3.1.11: FAN, SOF and the time of the fault of each record.
+want_list=$(jq -cS '[.disturbances[]? | {fan, sof: {tp: (.sof.tp // false), tm: (.sof.tm // false), test: (.sof.test // false), otev: (.sof.otev // false)}, time}]' "${FIXTURE}")
+for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
+    name=$(shared_server "${server}")
+    for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        if ! supported "${client}" "${server}" "server:disturbanceList,client:disturbanceList"; then
+            at_pair values.disturbance-list "${client}" "${server}"; skip "${client}->${server}: disturbance list"; continue
+        fi
+        doc=$(run_client "${client}" disturbance-list --host "${name}")
+        keep "iec103-values-disturbance-list-${client}->${server}" "${doc}"
+        value_check values.disturbance-list "${client}" "${server}" "disturbance-list" \
+            "$(jq -cS '.disturbances' <<<"${doc}" 2>/dev/null)" "${want_list}" "the list of recorded disturbances is the fixture's"
+    done
+done
+
+# Clause 7.4.7: the whole transfer of FAN 7 returns its description (ASDU
+# 26), its tags with their positions (ASDU 29) and every channel (ASDU 27);
+# a second check compares the values of the channels (ASDU 30). NOF and
+# TOV are not compared: not every library reports them.
+want_dist=$(jq -cS '.disturbances[0] | {fan, noc: (.channels | length), noe: (.channels[0].values | length), interval, start,
+    tags: [.tags[] | {pos, fun, inf, dpi}], channels: [.channels[] | {acc, rpv, rsv, rfa}]}' "${FIXTURE}")
+want_vals=$(jq -cS '[.disturbances[0].channels[] | {acc, values}]' "${FIXTURE}")
+for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
+    for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        if ! supported "${client}" "${server}" "server:disturbanceDataServer,client:disturbanceData"; then
+            at_pair values.disturbance-transfer "${client}" "${server}"; skip "${client}->${server}: disturbance transfer"; continue
+        fi
+        name=$(start_server "${server}"); wait_ready "${name}" || exit 1
+        doc=$(run_client "${client}" disturbance-transfer --fan 7 --host "${name}")
+        keep "iec103-values-disturbance-transfer-${client}->${server}" "${doc}"
+        value_check values.disturbance-transfer "${client}" "${server}" "disturbance-transfer" \
+            "$(jq -cS '.disturbance | {fan, noc, noe, interval, start, tags, channels: [.channels[] | {acc, rpv, rsv, rfa}]}' <<<"${doc}" 2>/dev/null)" \
+            "${want_dist}" "the transferred disturbance has the fixture's description, tags and channels"
+        value_check values.disturbance-values "${client}" "${server}" "disturbance-transfer values" \
+            "$(jq -cS '[.disturbance.channels[] | {acc, values}]' <<<"${doc}" 2>/dev/null)" "${want_vals}" \
+            "the transferred channels have the fixture's values"
+        stop_server "${name}"
     done
 done
 

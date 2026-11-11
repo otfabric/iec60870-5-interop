@@ -201,9 +201,15 @@ FEATURE_SUMMARY="${SUMMARY}"' + (if has("tls") then " tls=\(.tls)" else "" end)
 # measurands (cause 2), which arrive whenever a client polls class 2, so their
 # number in a result is not fixed. A time tag is the station's clock, and the
 # raw elements of an ASDU with a time tag carry it too.
+# IEC 103 (contract 2.3): for the generic services and the transmission of
+# disturbance data (generic-*, disturbance-*) the outcome line leaves out
+# every ASDU: their number depends on how the station splits the data and,
+# for a client that waits for the list after an interrogation, on the
+# interrogation; what they carried is in generic, disturbances and
+# disturbance, which the values checks compare with the fixture.
 # set_link_mode puts them in place of SUMMARY and NORMALIZE.
 # shellcheck disable=SC2034
-SUMMARY_103='"ok=\(.ok) error=\(.error.code // "-") conf=\([.confirmations[] | "\(.cot)\(if .negative then "n" else "" end)"] | join(",")) term=\(.terminated) asdus=\([.asdus[] | select(.typeId != 5 and .cot != 2) | "\(.type // .typeId)/\(.cot)"] | join(","))"'
+SUMMARY_103='(.operation | test("^(generic|disturbance)-")) as $svc | "ok=\(.ok) error=\(.error.code // "-") conf=\([.confirmations[] | "\(.cot)\(if .negative then "n" else "" end)"] | join(",")) term=\(.terminated) asdus=\([.asdus[] | select(.typeId != 5 and .cot != 2 and ($svc | not)) | "\(.type // .typeId)/\(.cot)"] | join(","))"'
 # shellcheck disable=SC2034
 NORMALIZE_103='del(.adapter, .elapsedMs, .error.message) | .asdus |= map(select(.typeId != 5 and .cot != 2))
     | (.asdus[]?.objects[]? |= del(.time, .time32, .timeInvalid))
