@@ -2,26 +2,30 @@
 
 What the self-tests of this repository showed, with exact counts. A count is
 the number of outcomes in `reports/results.json` (interop-result-v1); only
-`pass` passes. Every run below was made locally on 2026-11-11 on Docker for
-macOS (linux/arm64 engine) with the `:dev` images built from this commit's
-sources. Nothing has run on amd64 or in CI yet.
+`pass` passes. The sections below are the local runs made while each part was
+built (Docker for macOS, linux/arm64 engine, `:dev` images); the Release
+workflow repeats the smoke and cross-stack runs natively on amd64 and arm64
+before it publishes the images of a version.
 
 Reproduce: `make images`, then `make documents` (or the commands per row).
 
-`reports/results.json` of these runs: 4014 pass, 0 fail, 583 unsupported,
-44 known-difference, 0 infra-error. The 7 capability documents and 1647
-client result documents kept in `reports/` validate against `schemas/`
-(`scripts/validate-documents.py`, 0 errors). The IEC 101 rows are the final
-runs on the committed sources; the IEC 104 images were built before the last
-edit of THIRD_PARTY_NOTICES.md (which they copy to `/licenses`), with
-otherwise identical sources.
+`reports/results.json` is the full `make documents` run of contract 2.3
+(commit 834a191, 2026-11-11, linux/arm64, `:dev` images): 5857 pass, 0 fail,
+667 unsupported, 153 known-difference, 0 infra-error. The 13 capability
+documents and 2590 client result documents kept in `reports/` validate against
+`schemas/` (`scripts/validate-documents.py`, 0 errors). The digitalpetri
+station was changed after that run (it now waits for each reply of a command
+to leave before it queues the next, RELEASE.md v0.4.0); its smoke runs and the
+IEC 101 cross-stack runs were repeated on the changed image: 48 + 48 smoke,
+1064 pass and 45 unsupported unbalanced, 913 pass and 64 known-difference
+balanced, 0 fail.
 
 ## IEC 60870-5-101
 
 ### Contract 2.3: three stacks, field sizes (2026-11-11)
 
 Run on the `:dev` images of all three IEC 101 adapters built from the
-branch of contract 2.3 (interop_version 0.4.0, not released), on
+branch of contract 2.3 (interop_version 0.4.0, before its release), on
 linux/arm64. Documents were not kept (`make documents` was not run for this
 change), so the counts are those `scripts/interop.sh` and `scripts/smoke.sh`
 printed. The three IEC 101 capability documents (kept by a smoke run with

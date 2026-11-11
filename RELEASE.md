@@ -20,7 +20,7 @@ section per version, newest first, each ending with a `---` line.
 
 ## v0.4.0
 
-**Date:** not released (prepared 2026-11-11)
+**Date:** 2026-11-11
 **Previous release:** v0.3.0
 
 ### Added
@@ -88,7 +88,7 @@ Locally on linux/arm64 (Docker on macOS), 2026-11-11: smoke of `iec102-gisce` ag
 
 ## v0.2.0
 
-**Date:** not released (prepared 2026-11-11)
+**Date:** 2026-11-11
 **Previous release:** v0.1.0
 
 ### Added

@@ -9,7 +9,7 @@ containers, behind one command-line contract, with deterministic fixtures.
 A library or tool that implements IEC 101, 102, 103 or 104 tests against these
 images; nothing in this repository knows about any such consumer.
 
-**Status: v0.3.0 released (IEC 101, 102, 103, 104; contract 2.2); v0.4.0 (third IEC 101 stack, field sizes, IEC 103 generic services and disturbance data, contract 2.3) prepared, not released.**
+**Status: v0.4.0 (IEC 101, 102, 103, 104; contract 2.3: third IEC 101 stack, field sizes, IEC 103 generic services and disturbance data).**
 
 | Standard | Images (`ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`) | Status |
 |----------|-------------------------------------------------------------------|--------|
