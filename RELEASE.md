@@ -35,11 +35,19 @@ section per version, newest first, each ending with a `---` line.
 
 ### Changed
 
-- `adapters/iec101/digitalpetri/` is EPL-2.0, the library's licence, not GPL-3.0-or-later like the other adapters: digitalpetri/iec60870 has no Secondary License notice, so it cannot be combined with GPL code (AGENTS.md rule 6, THIRD_PARTY_NOTICES.md). `licenses/EPL-2.0.txt` added.
+- `adapters/iec101/digitalpetri/` is EPL-2.0, the library's licence, not GPL-3.0-or-later like the other adapters: digitalpetri/iec60870 has no Secondary License notice, so it cannot be combined with GPL code (AGENTS.md rule 6 names the exception, THIRD_PARTY_NOTICES.md). `licenses/EPL-2.0.txt` added.
+- `schemas/capabilities.schema.json`: `cotSizes` and `ioaSizes` added, `linkAddressSizes` and `caSizes` extended to IEC 101 (`linkAddressSizes` 0 for IEC 101 only); an IEC 101 document requires the four size lists and the features `unbalancedMode`, `balancedMode`, `distinctBalancedAddresses` and `unbalancedCommonAddress`.
+- `schemas/client-result.schema.json`: the `generic`, `disturbances` and `disturbance` parts of IEC 103 results.
+- `fixtures/schema/iec60870-5-103-fixture.schema.json`: the optional `generic` entries and `disturbances` records; `scripts/validate-fixtures.py` checks them (unique GIN, value of the declared type and size; unique FAN, tags in order with the initial states at position 0, channels in ascending ACC with one NOE). `schemaVersion` stays `"1.0"`: the parts are optional, so every fixture of 1.0 is still valid.
+- `scripts/interop-iec103.sh`: the value checks of contract 2.3 (generic read and write, disturbance list, transfer and values).
+- `scripts/check-versions.sh`: the pins of `iec101-digitalpetri` (version, revision, Maven and JRE digests, gson and slf4j), and that both stages of its Dockerfile pin the same revision.
 
 ### Verified
 
-See docs/COMPATIBILITY.md (IEC 60870-5-101). Locally on linux/arm64 (Docker on macOS), 2026-11-11. Nothing ran on amd64 or in CI.
+See docs/COMPATIBILITY.md (IEC 60870-5-101 and IEC 60870-5-103). Locally on linux/arm64 (Docker on macOS), 2026-11-11. Nothing ran on amd64 or in CI.
+
+- IEC 101, contract 2.3, three stacks: smoke 48 pass per image and link mode; cross-stack unbalanced 1064 pass, 0 fail, 45 unsupported; balanced 913 pass, 0 fail, 64 known-difference (cbsigma client against digitalpetri server).
+- IEC 103, contract 2.3: smoke 53 (vitusdong), 34 each (goiecp5, ariec103, open103); cross-stack 36 pass, 0 fail, 45 known-difference, 39 unsupported. The generic and disturbance-list cases pass only for vitusdong against itself, which is not evidence; no harness server serves the fixture's disturbance values.
 
 ---
 

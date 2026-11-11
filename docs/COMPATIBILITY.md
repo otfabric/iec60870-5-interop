@@ -114,7 +114,7 @@ address with a three-octet object address; a link that does not start
 (`link-init-timeout`, exit 3); a second connection while one is served
 (refused).
 
-### Not shown by these runs
+### Not shown by the contract 2.2 run
 
 - The pair is not two fully independent oracles: cB-Sigma's IEC 101 link was
   debugged against lib60870-C (docs/REFERENCE_STACKS.md). digitalpetri is
@@ -125,6 +125,16 @@ address with a three-octet object address; a link that does not start
   than `--link-address`): cbsigma cannot, and no lib60870 pairing ran it.
 - `--link-address-size 0` was not run (it is since contract 2.3).
 - Interrogation groups and qualities on M_BO_NA_1 have no IEC 101 fixture yet.
+
+Not shown by the contract 2.3 run either:
+
+- A one-octet information object address: no field-size case uses
+  `--ioa-size 1` (the four other sets are 0112, 1213, 2122 and 2223).
+- Balanced mode with distinct link addresses across stacks: no case of
+  `tests/iec101/cases.tsv` passes `--remote-link-address`.
+- digitalpetri's unbalanced client when the common address differs from the
+  link address: it declares `unbalancedCommonAddress` false, so those cases
+  are unsupported (above).
 
 ### Observations
 
@@ -147,7 +157,10 @@ address with a three-octet object address; a link that does not start
 
 ### Known upstream defects
 
-None found for IEC 101 (`tests/iec101/known-bugs.tsv` is empty).
+One, from the contract 2.3 run: `digitalpetri-balanced-server-no-link-reset`
+in `tests/iec101/known-bugs.tsv` (a balanced digitalpetri station sends user
+data without resetting the controlling station's link first; evidence
+above).
 
 ## IEC 60870-5-102
 
@@ -230,6 +243,8 @@ siblings fix the address range to 1..8 and the record to its register names
 
 ## IEC 60870-5-103
 
+### Contract 2.1 run
+
 Run locally on 2026-11-11 (linux/arm64, `:dev` images of this commit), with
 `REPORT_DIR` set; `results.json` of the IEC 103 runs: 182 pass, 0 fail,
 4 unsupported, 45 known-difference, 0 infra-error. The 4 capability
@@ -274,7 +289,7 @@ as their own bugs (7 each) and those of goiecp5 and vitusdong as vitusdong's
 | ariec103 v1.2.31-3-gec08dd7: general command without the RII | 4 command cases, values.command-* (3) (ariec103 → vitusdong) | `68 09 09 68 53 01 14 81 14 01 A0 10 02 B0 16`: FUN 160, INF 16, DCO 2 and no RII (clause 7.3.2.4); go-iec60870-5's consumer suite saw `14 81 14 01 A0 63 02` and its server, which checks the length, sends no acknowledgement; Iec103Server takes the short ASDU |
 | open103 887ff5a5: a command only for the typical INF of the identified function type | 4 command cases, values.command-* (3) (open103 → vitusdong) | nothing sent (error `failed`): vitusdong identifies with FUN 255, for which `CommandTrasmission` allows no INF; against a station of FUN 160 (go-iec60870-5's consumer suite) it sent 16..19 and nothing for 160/23, whose FUN column in table 17 is typical, not mandatory |
 
-### Not shown by these runs
+#### Not shown by the contract 2.1 run
 
 - No server in this run follows IEC 60870-5-103 in its replies, so none of the
   case expectations that involve an interrogation, an identification or a
@@ -292,12 +307,24 @@ as their own bugs (7 each) and those of goiecp5 and vitusdong as vitusdong's
   emulation and answered an interrogation there (2026-11-11); the self-tests
   ran on linux/arm64 only.
 
-### Generic services and disturbance data (contract 2.3)
+### Contract 2.3: generic services and disturbance data
 
 Run locally on 2026-11-11 (linux/arm64, `:dev` images of branch
-feat/iec103-generic-disturbance). In this harness only vitusdong has a
-server, and it declares `genericServices` and `disturbanceList` but not
-`disturbanceDataServer` (it cannot serve the fixture's tags and values):
+feat/iec103-generic-disturbance), on the 16 cases of `tests/iec103/cases.tsv`
+(7 of them new in contract 2.3):
+
+| Run | Command | pass | fail | other |
+|-----|---------|-----:|-----:|------:|
+| smoke vitusdong (server and client) | `scripts/smoke.sh iec103 vitusdong` | 53 | 0 | 0 |
+| smoke goiecp5, ariec103, open103 (clients, against vitusdong's server) | `scripts/smoke.sh iec103 <adapter>` | 34 each | 0 | 0 |
+| cross-stack, unbalanced | `scripts/interop.sh iec103 vitusdong goiecp5 ariec103 open103` | 36 | 0 | 45 known-difference, 39 unsupported |
+
+The 45 known differences are those of the contract 2.1 run (above). Of the
+pass count, the generic and disturbance-list cases passed only for vitusdong
+against itself, which is not evidence (below). In this harness only
+vitusdong has a server, and it declares `genericServices` and
+`disturbanceList` but not `disturbanceDataServer` (it cannot serve the
+fixture's tags and values):
 
 | Scenario | vitusdong → vitusdong | goiecp5, ariec103, open103 → vitusdong |
 |----------|-----------------------|----------------------------------------|

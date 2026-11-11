@@ -9,7 +9,7 @@ containers, behind one command-line contract, with deterministic fixtures.
 A library or tool that implements IEC 101, 102, 103 or 104 tests against these
 images; nothing in this repository knows about any such consumer.
 
-**Status: v0.3.0 released (IEC 101, 102, 103, 104; contract 2.2); v0.4.0 (third IEC 101 stack, field sizes, contract 2.3) prepared, not released.**
+**Status: v0.3.0 released (IEC 101, 102, 103, 104; contract 2.2); v0.4.0 (third IEC 101 stack, field sizes, IEC 103 generic services and disturbance data, contract 2.3) prepared, not released.**
 
 | Standard | Images (`ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`) | Status |
 |----------|-------------------------------------------------------------------|--------|
@@ -65,7 +65,8 @@ docker stop station && docker network rm iec101-demo
 ## Layout
 
 ```text
-adapters/<standard>/<stack>/   one image each (GPL-3.0-or-later, adapters/LICENSE)
+adapters/<standard>/<stack>/   one image each (GPL-3.0-or-later, adapters/LICENSE; except
+                               adapters/iec101/digitalpetri/, EPL-2.0)
 fixtures/<standard>/<name>/    fixture.json, baked into the images of that standard
 fixtures/schema/               the fixture schemas (IEC 101/104, IEC 102, IEC 103)
 schemas/                       capability, client result and interop-result-v1 schemas
@@ -80,5 +81,7 @@ reports/                       interop-result-v1 results.json and the documents 
 The repository is MIT ([LICENSE](LICENSE)). The adapter programs under
 `adapters/` link GPL-3.0 libraries (or, for IEC 102, import the AGPL-3.0
 gisce/iec870ree) and are GPL-3.0-or-later
-([adapters/LICENSE](adapters/LICENSE), [licenses/GPL-3.0.txt](licenses/GPL-3.0.txt)).
+([adapters/LICENSE](adapters/LICENSE), [licenses/GPL-3.0.txt](licenses/GPL-3.0.txt))
+(except `adapters/iec101/digitalpetri/`, EPL-2.0;
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 A consumer talks to the images over TCP and is not affected by their licence.

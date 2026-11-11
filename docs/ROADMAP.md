@@ -1,7 +1,8 @@
 # Roadmap
 
 What exists is in [COMPATIBILITY.md](COMPATIBILITY.md); candidates are
-assessed in [REFERENCE_STACKS.md](REFERENCE_STACKS.md). Nothing here is done.
+assessed in [REFERENCE_STACKS.md](REFERENCE_STACKS.md). Items marked done
+are kept for reference.
 
 ## IEC 60870-5-101
 
@@ -35,17 +36,24 @@ meter. Next:
 Contract 2.1 has the IEC 103 images (vitusdong server and client; goiecp5,
 ariec103, open103 clients). Next:
 
-1. **A second fixture-driven server.** The only one, vitusdong, deviates from
+1. Done in 0.4.0: **generic services and disturbance data** (contract 2.3,
+   ASDU 10/21 and 23..31): operations `generic-read`, `generic-write`,
+   `disturbance-list` and `disturbance-transfer`, a `generic` and a
+   `disturbances` part of the fixture, 7 cases. Only vitusdong has a server
+   for them, so inside the harness they run as one self-pairing
+   (COMPATIBILITY.md).
+2. **A second fixture-driven server.** The only one, vitusdong, deviates from
    the standard in every reply the cases check (tests/iec103/known-bugs.tsv),
    so the expectations of `tests/iec103/cases.tsv` are the contract's and no
    reference server meets them yet. Candidates: the ArIEC103 slave simulator
    behind a fixture (its model is fixed in code, so this needs a change
    upstream or a different simulator); dscsystems/rs-iec60870-5 has no
    secondary.
-3. **Generic services and disturbance data** (ASDU 10/11/21, 23..31):
-   operations `generic-read` and `disturbance-list`/`disturbance-get`, a
-   `generic` and a `disturbances` part of the fixture. Only vitusdong has both
-   roles for them, so the first run would be one pairing.
+3. **More of generic services and disturbance data:** a server that serves
+   the fixture's disturbance values (`disturbanceDataServer`; vitusdong
+   cannot), generic reads by heading, group or directory (INF 240, 241,
+   243), the general interrogation of generic data, writes with confirmation
+   or abort, and aborts of a disturbance transfer or more than one record.
 4. Broadcast clock synchronization: no client of the survey sends SEND/NO
    REPLY to address 255; the contract defines `--broadcast` for a consumer.
 5. Upstream reports of the known bugs (the maintainer files them).
