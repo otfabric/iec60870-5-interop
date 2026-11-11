@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>iec60870-5-interop</AssemblyName>
+    <RootNamespace>Interop103</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <AdapterVersion Condition="'$(AdapterVersion)' == ''">dev</AdapterVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../common/*.cs" />
+    <AssemblyMetadata Include="AdapterVersion" Value="$(AdapterVersion)" />
+    <AssemblyMetadata Include="UpstreamVersion" Value="$(UpstreamVersion)" />
+    <AssemblyMetadata Include="UpstreamRevision" Value="$(UpstreamRevision)" />
+  </ItemGroup>
+</Project>

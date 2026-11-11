@@ -24,6 +24,10 @@ serial_standard() { [[ "${STANDARD}" != iec104 ]]; }
 LINK_FLAGS=()
 set_link_mode() {
     LINK_FLAGS=()
+    if [[ "${STANDARD}" == iec103 ]]; then
+        SUMMARY="${SUMMARY_103}"
+        NORMALIZE="${NORMALIZE_103}"
+    fi
     if serial_standard; then
         LINK_MODE="${LINK_MODE:-unbalanced}"
         LINK_FLAGS=(--link-mode "${LINK_MODE}")
@@ -176,6 +180,19 @@ FEATURE_SUMMARY="${SUMMARY}"' + (if has("tls") then " tls=\(.tls)" else "" end)
     + (if has("file") then " file=\(.file.length)/\(.file.received)/\(.file.sections)" else "" end)
     + (if has("directory") then " directory=\([.directory[] | "\(.ioa):\(.nof):\(.lof):\(.sof)"] | join(","))" else "" end)
     + (if has("redundancy") then " redundancy=\(.redundancy.primaryAsdus)/\(.redundancy.standbyAsdus)/\(.redundancy.strayAsdus)/\(.redundancy.queuedEvent)" else "" end)'
+
+# IEC 103 (contract 2.1): the outcome line and the normalization leave out
+# the identification (checked by values.identification) and the cyclic
+# measurands (cause 2), which arrive whenever a client polls class 2, so their
+# number in a result is not fixed. A time tag is the station's clock, and the
+# raw elements of an ASDU with a time tag carry it too.
+# set_link_mode puts them in place of SUMMARY and NORMALIZE.
+# shellcheck disable=SC2034
+SUMMARY_103='"ok=\(.ok) error=\(.error.code // "-") conf=\([.confirmations[] | "\(.cot)\(if .negative then "n" else "" end)"] | join(",")) term=\(.terminated) asdus=\([.asdus[] | select(.typeId != 5 and .cot != 2) | "\(.type // .typeId)/\(.cot)"] | join(","))"'
+# shellcheck disable=SC2034
+NORMALIZE_103='del(.adapter, .elapsedMs, .error.message) | .asdus |= map(select(.typeId != 5 and .cot != 2))
+    | (.asdus[]?.objects[]? |= del(.time, .time32, .timeInvalid))
+    | (.asdus[]? |= if (.typeId == 1 or .typeId == 2 or .typeId == 4 or .typeId == 6) then (.objects[]? |= del(.data)) else . end)'
 
 KNOWN=0
 

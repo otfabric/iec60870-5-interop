@@ -1,12 +1,15 @@
 # Fixtures
 
-Fixtures live in `fixtures/<standard>/<name>/fixture.json`, one schema for all
-standards ([`fixtures/schema/iec60870-5-fixture.schema.json`](../fixtures/schema/iec60870-5-fixture.schema.json)).
+Fixtures live in `fixtures/<standard>/<name>/fixture.json`, one schema for
+IEC 101, 102 and 104 ([`fixtures/schema/iec60870-5-fixture.schema.json`](../fixtures/schema/iec60870-5-fixture.schema.json))
+and one for IEC 103, whose objects have no address but a function type and an
+information number ([`fixtures/schema/iec60870-5-103-fixture.schema.json`](../fixtures/schema/iec60870-5-103-fixture.schema.json), [below](#iec-103)).
 An image bakes in the fixtures of its standard at `/fixtures/<name>/fixture.json`.
 
 | Standard | Fixtures | Notes |
 |----------|----------|-------|
 | IEC 101 | `baseline` | The IEC 104 baseline without its files; every address fits a two-octet information object address (`--ioa-size 2`, the default); `scripts/validate-fixtures.py` enforces 65535 as the limit |
+| IEC 103 | `baseline` | A protection device of function type 160; [IEC 103](#iec-103) |
 | IEC 104 | `baseline`, `extended` | As in iec104-interop 0.6.0 |
 
 The station behaviour below is the same for IEC 101, except that IEC 101 has
@@ -363,6 +366,79 @@ ignored by a station that does not serve them). Its station serves the requests 
 | IOA | Upload name | Largest file |
 |----:|------------:|-------------:|
 | 31000 | 1 | 8192 |
+
+## IEC 103
+
+An IEC 103 fixture describes a simulated protection device (the secondary
+station): its identification, its indications, its measurands and the general
+commands it takes. `scripts/validate-fixtures.py` checks it against the IEC 103
+schema and the rules below; an adapter applies the same rules at start and
+exits 4 on a violation.
+
+```json
+{
+  "schemaVersion": "1.0",
+  "name": "baseline",
+  "station": {
+    "commonAddress": 1,
+    "identification": { "fun": 160, "col": 2, "ascii": "OTFAB103", "software": "01020304" }
+  },
+  "indications": [ { "fun": 160, "inf": 16, "dpi": 2 }, { "fun": 160, "inf": 68, "dpi": 1, "gi": false } ],
+  "measurands": [ { "fun": 160, "inf": 148, "type": 9, "values": [ { "value": 100 }, { "value": 4095, "ov": true } ] } ],
+  "commands": [ { "fun": 160, "inf": 16 } ]
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `station.commonAddress` | 0..254; normally the link address |
+| `station.identification` | ASDU 5: `fun` the device's function type, `col` the compatibility level, `ascii` exactly eight printable characters, `software` four octets in hex |
+| `indications[]` | `fun` 0..254 and `inf`, unique together; `dpi` 0..3 (1 off, 2 on); `gi` false keeps it out of the general interrogation (default true) |
+| `measurands[]` | `fun`, `inf` (unique with the indications), `type` 3 (measurands I, at most four values) or 9 (measurands II, at most nine), `values[]`: `value` -4096..4095 (the 13-bit value), `ov`, `er` (default false) |
+| `commands[]` | `fun`, `inf`: a general command the device takes, acting on the indication with the same function type and information number, which must exist |
+
+### Station behaviour (IEC 103)
+
+The station is unbalanced: it answers the primary station's requests and
+signals class 1 data with ACD. Its process state (the DPI of the indications)
+lives as long as the process; its link state and class 1 queue start afresh
+with every connection.
+
+| Request | Answer |
+|---------|--------|
+| Reset of the communication unit (function 0) | ACK; queues ASDU 5, cause 4, the identification's function type, INF 3, COL, the eight characters and the four octets |
+| Reset of the frame count bit (function 7) | ACK; queues ASDU 5 with cause 3 and INF 2 |
+| Request of the status of the link (function 9) | Status of link (function 11) |
+| Class 1 (function 10) | The next queued ASDU (function 8, ACD while more are queued), or no data (function 9) |
+| Class 2 (function 11) | One measurand of the fixture after the other, cyclically: ASDU 3 or 9, cause 2, the values in order; no data (function 9) when the fixture has none. ACD when class 1 data is queued |
+| ASDU 7 (general interrogation, FUN 255, INF 0) | ACK; queues ASDU 1, cause 9, SIN the scan number, for every indication with `gi` not false, in the fixture's order, then ASDU 8, cause 10, the same scan number |
+| ASDU 6 (clock synchronization), addressed | ACK; sets the station's clock; queues ASDU 6, cause 8, FUN 255, INF 0 with the new time |
+| ASDU 6 to link address 255 (SEND/NO REPLY) | Sets the clock; no answer |
+| ASDU 20 (general command) | ACK. A command of the fixture with DCO 1 or 2: the indication's DPI becomes the DCO, and the station queues ASDU 1, cause 20 (positive acknowledgement), the command's FUN and INF, the new DPI, SIN the RII. Anything else (a FUN/INF that is no command of the fixture, DCO 0 or 3): nothing changes, ASDU 1, cause 21 (negative acknowledgement), the DPI of the indication (0 when there is none), SIN the RII |
+
+Time tags (CP32Time2a of ASDU 1) are the station's clock. Nothing else is
+sent: no spontaneous ASDUs, no cause 12 report after a command.
+
+### The IEC 103 baseline fixture
+
+`fixtures/iec103/baseline`: an overcurrent protection device (function type
+160) identified as `OTFAB103`, COL 2, software `01020304`.
+
+| Indication | DPI | In the interrogation | Command |
+|------------|-----|----------------------|---------|
+| 160/16 auto-recloser active | 2 (on) | yes | yes |
+| 160/17 teleprotection active | 1 (off) | yes | yes |
+| 160/18 protection active | 2 | yes | yes |
+| 160/19 LED reset | 1 | yes | yes |
+| 160/23 characteristic 1 | 2 | yes | yes |
+| 160/24 characteristic 2 | 1 | yes | yes |
+| 160/27 auxiliary input 1 | 1 | yes | no |
+| 160/36 trip circuit supervision | 1 | yes | no |
+| 160/68 general trip | 1 | no | no |
+
+Measurands, class 2: 160/144 (ASDU 3, one value 2048), 160/145 (ASDU 3, 1024
+and -512 with OV), 160/148 (ASDU 9, nine values: 100, 200, 300, 3000, 3001,
+2999, -4096, 4095 with OV, 0 with ER).
 
 ## Adding a fixture
 

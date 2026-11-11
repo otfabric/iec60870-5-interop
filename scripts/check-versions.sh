@@ -79,4 +79,21 @@ if [[ "${cb101}" != "$(sed -nE 's|^require github.com/cB-Sigma/iec60870 (v[^ ]+)
     echo "FAIL iec101 iec60870 version: Dockerfile and go.mod disagree"
     status=1
 fi
+# ---- IEC 103 ----
+gi=$(arg adapters/iec103/goiecp5/Dockerfile GOIECP5_VERSION)
+need "iec103 goiecp5 golang" "$(arg adapters/iec103/goiecp5/Dockerfile GOLANG_DIGEST)"
+need "iec103 goiecp5 debian" "$(arg adapters/iec103/goiecp5/Dockerfile DEBIAN_DIGEST)"
+need "go-iecp5 (riclolsen) version" "version: \"${gi}\""
+if [[ "${gi}" != "$(sed -nE 's|^require github.com/riclolsen/go-iecp5 (v[^ ]+).*$|\1|p' adapters/iec103/goiecp5/go.mod)" ]]; then
+    echo "FAIL go-iecp5 (riclolsen) version: Dockerfile and go.mod disagree"
+    status=1
+fi
+for pair in vitusdong:VITUSDONG ariec103:ARIEC103 open103:OPEN103; do
+    a=${pair%%:*} v=${pair#*:}
+    need "iec103 ${a} version"  "version: \"$(arg "adapters/iec103/${a}/Dockerfile" "${v}_VERSION")\""
+    need "iec103 ${a} revision" "$(arg "adapters/iec103/${a}/Dockerfile" "${v}_SHA")"
+    need "iec103 ${a} sdk"      "$(arg "adapters/iec103/${a}/Dockerfile" SDK_DIGEST)"
+    need "iec103 ${a} runtime"  "$(arg "adapters/iec103/${a}/Dockerfile" RUNTIME_DIGEST)"
+    [[ -f "adapters/iec103/${a}/packages.lock.json" ]] || { echo "FAIL iec103 ${a}: no packages.lock.json"; status=1; }
+done
 exit "${status}"

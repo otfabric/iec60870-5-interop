@@ -18,6 +18,29 @@ section per version, newest first, each ending with a `---` line.
 
 ---
 
+## v0.2.0
+
+**Date:** not released (prepared 2026-11-11)
+**Previous release:** v0.1.0
+
+### Added
+
+- Container contract 2.1 (docs/CONTAINER_CONTRACT.md, section IEC 103): IEC 60870-5-103 over the FT 1.2 stream on one TCP connection, port 2401, unbalanced only, one-octet link address, the protection equipment as server and the control system as client. Client operations `connect`, `interrogate` (`--scn`), `clock-sync` (`--time`, `--broadcast`), `command` (`--fun`, `--inf`, `--dco`, `--rii`), `monitor`; confirmations with causes 8, 20 and 21; ASDU documents by function type and information number (`fun`, `inf`, `dpi`, `sin`, `time32`, `values`, `col`, `ascii`, `software`, `scn`, `dco`, `rii`, `data`); server events `interrogation`, `clock-sync`, `command`; `asduTypes` and the features `generalCommand`, `identification`, `measurands`, `broadcastClockSync`, `genericServices`, `disturbanceData` in capability documents. An image may be a client only.
+- `fixtures/iec103/baseline` (an overcurrent protection device, function type 160: identification, nine indications, three measurands, six general commands) with its own schema, `fixtures/schema/iec60870-5-103-fixture.schema.json`, and rules in `scripts/validate-fixtures.py`.
+- IEC 103 images: `iec103-vitusdong` (vitusdong/iec103-dotnet v0.1.0, server and client), `iec103-ariec103` (masarray/ARIEC103 `ec08dd73`, client, on a TCP transport of its own since its serial port fails on a pty), `iec103-open103` (XVincentX/Open103 `887ff5a5`, client, compiled for Linux with a shim), `iec103-goiecp5` (riclolsen/go-iecp5 v0.4.7 cs103, client; built and tested, not published until its licence is settled).
+- `scripts/smoke-iec103.sh`, `scripts/interop-iec103.sh`, `tests/iec103/cases.tsv` (9 cases), `tests/iec103/known-bugs.tsv` (4 upstream defects with wire evidence), `make smoke-iec103`, `make interop-iec103`; `scripts/interop.sh` pairs every client with every server by their roles.
+- The client result and capability schemas take the IEC 103 fields.
+
+### Changed
+
+- `make publish`, `publish-arch`, `publish-manifest` and `digests` leave out the images of `UNPUBLISHED` (`iec103-goiecp5`).
+
+### Verified
+
+Locally on linux/arm64 (Docker on macOS), 2026-11-11: smoke of the four IEC 103 images and the IEC 103 cross-stack run, counts in docs/COMPATIBILITY.md; the four IEC 103 images also build and answer for linux/amd64 under emulation. IEC 101 smoke unchanged.
+
+---
+
 ## v0.1.0
 
 **Date:** 2026-11-11

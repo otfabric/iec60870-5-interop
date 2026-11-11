@@ -12,6 +12,9 @@
 #   - a general interrogation returns exactly the points of the fixture,
 #   - a command changes what a later interrogation reports,
 #   - k = w = 1, an idle connection and concurrent sessions work.
+# IEC 103 (scripts/interop-iec103.sh) has its own checks on values: the
+# interrogation, the identification, a command and the measurands; and its
+# images may be clients only, so pairings are every client with every server.
 # And tests/feature-cases.tsv and tests/secure-cases.tsv for the pairings that
 # have what those cases need.
 #
@@ -116,10 +119,19 @@ hit_known_bug() {
     return 0
 }
 
+# The adapters with each role. Every IEC 101 and 104 image has both; an IEC 103
+# image may be a client only.
+SERVERS=() CLIENTS=()
+for adapter in "${ADAPTERS[@]}"; do
+    has_role "${adapter}" server && SERVERS+=("${adapter}")
+    has_role "${adapter}" client && CLIENTS+=("${adapter}")
+done
+log "servers: ${SERVERS[*]:-none}; clients: ${CLIENTS[*]:-none}"
+
 # One server per adapter is shared by the read-only cases; cases that change
 # the station get a server of their own.
 shared_server() { SERVER_TAG=shared server_name "$1"; }
-for adapter in "${ADAPTERS[@]}"; do
+for adapter in ${SERVERS[@]+"${SERVERS[@]}"}; do
     name=$(SERVER_TAG=shared start_server "${adapter}")
     wait_ready "${name}" || exit 1
 done
@@ -136,8 +148,8 @@ while IFS=$'\t' read -r case_id state want_exit want_summary needs operation; do
     [[ -z "${case_id}" || "${case_id}" == \#* ]] && continue
     n=$((n + 1))
     reference="" reference_pair=""
-    for server in "${ADAPTERS[@]}"; do
-        for client in "${ADAPTERS[@]}"; do
+    for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
+        for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
             pair="${client}->${server}"
             at_pair "${case_id}" "${client}" "${server}"
             if ! supported "${client}" "${server}" "${needs}"; then
@@ -184,6 +196,10 @@ while IFS=$'\t' read -r case_id state want_exit want_summary needs operation; do
     done
 done < "${CASES}"
 
+if [[ "${STANDARD}" == iec103 ]]; then
+    # shellcheck source=scripts/interop-iec103.sh
+    source "${SCRIPT_DIR}/interop-iec103.sh"
+else
 # ---- values: an interrogation returns the fixture ----
 want_points=$(jq -cS '[.points[] | select(.type != "M_IT_NA_1")
     | {ioa, type, value, quality: (.quality // [])}] | sort_by(.ioa)' "${FIXTURE}")
@@ -250,6 +266,8 @@ if serial_standard; then
         done
     done
 fi
+
+fi  # IEC 101 and 104 values and sessions
 
 # ---- sessions (IEC 104): flow control windows, idle test, concurrent connections ----
 if ! serial_standard; then
