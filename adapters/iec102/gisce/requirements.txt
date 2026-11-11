@@ -1,0 +1,13 @@
+# Runtime dependencies of gisce/iec870ree 0.14.1 (its requirements.txt pins
+# bitstring 3.1.5 and names six and pytz; protocol.py also imports
+# python-dateutil, which it does not declare; pyserial is needed only by its
+# modem transport, which the adapter does not use). Installed with
+# pip --require-hashes --no-deps.
+bitstring==3.1.5 \
+    --hash=sha256:c163a86fcef377c314690051885d86b47419e3e1770990c212e16723c1c08faa
+six==1.17.0 \
+    --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274
+pytz==2026.6 \
+    --hash=sha256:7fed3fee8fd6bd4a2b7b75a8d56021d0624127bf69bd5691f115db929ac570b3
+python-dateutil==4.0.0 \
+    --hash=sha256:a5e246f79eb80475e691bf93862cead98decd8a498cf53ba0516fcdc0f50dc1c

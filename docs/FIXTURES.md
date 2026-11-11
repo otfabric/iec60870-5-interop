@@ -1,14 +1,17 @@
 # Fixtures
 
 Fixtures live in `fixtures/<standard>/<name>/fixture.json`, one schema for
-IEC 101, 102 and 104 ([`fixtures/schema/iec60870-5-fixture.schema.json`](../fixtures/schema/iec60870-5-fixture.schema.json))
-and one for IEC 103, whose objects have no address but a function type and an
-information number ([`fixtures/schema/iec60870-5-103-fixture.schema.json`](../fixtures/schema/iec60870-5-103-fixture.schema.json), [below](#iec-103)).
+IEC 101 and 104 ([`fixtures/schema/iec60870-5-fixture.schema.json`](../fixtures/schema/iec60870-5-fixture.schema.json)),
+one for IEC 103, whose objects have no address but a function type and an
+information number ([`fixtures/schema/iec60870-5-103-fixture.schema.json`](../fixtures/schema/iec60870-5-103-fixture.schema.json), [below](#iec-103)),
+and one for IEC 102, a meter's integration periods per record address
+([`fixtures/schema/iec60870-5-102-fixture.schema.json`](../fixtures/schema/iec60870-5-102-fixture.schema.json), [below](#iec-102)).
 An image bakes in the fixtures of its standard at `/fixtures/<name>/fixture.json`.
 
 | Standard | Fixtures | Notes |
 |----------|----------|-------|
 | IEC 101 | `baseline` | The IEC 104 baseline without its files; every address fits a two-octet information object address (`--ioa-size 2`, the default); `scripts/validate-fixtures.py` enforces 65535 as the limit |
+| IEC 102 | `baseline` | An electricity meter (REE profile) with hourly integrated totals and tariff information; [IEC 102](#iec-102) |
 | IEC 103 | `baseline` | A protection device of function type 160; [IEC 103](#iec-103) |
 | IEC 104 | `baseline`, `extended` | As in iec104-interop 0.6.0 |
 
@@ -452,6 +455,85 @@ in the control direction (clause 7.2.5.2).
 Measurands, class 2: 160/144 (ASDU 3, one value 2048), 160/145 (ASDU 3, 1024
 and -512 with OV), 160/148 (ASDU 9, nine values: 100, 200, 300, 3000, 3001,
 2999, -4096, 4095 with OV, 0 with ER).
+
+## IEC 102
+
+An IEC 102 fixture describes one integrated total station (an electricity
+meter with the REE profile): `fixtures/iec102/<name>/fixture.json`, schema
+`fixtures/schema/iec60870-5-102-fixture.schema.json`. All times are the
+station's local time in standard time (SU 0): time a `YYYY-MM-DDTHH:MM`, time
+b `YYYY-MM-DDTHH:MM:SS.mmm` ([contract](CONTAINER_CONTRACT.md#iec-102-link)).
+
+| Field | Meaning |
+|-------|---------|
+| `station.commonAddress` | The measuring point address (common address of ASDU) |
+| `station.accessKey` | REE: the access key C_AC_NA_2 must carry (four octets) |
+| `station.clock` | The station's clock (time b). It **stands still** at this time, so that reads are deterministic, until a C_CS_TA_2 sets it; the new time then lives as long as the station's process, across connections |
+| `station.product` | P_MP_NA_2: `standard` (first octet), `manufacturer` (an octet), `product` (four octets) |
+| `totals[]` | Integrated totals of one record address (`record`) and kind (`kind`: `absolute` served as M_IT_TG_2 to C_CI_NT_2, `incremental` as M_IT_TK_2 to C_CI_NU_2): `periods[]`, oldest first, each with its `end` (time a, the common time tag) and `totals[]` (`address` 1..255, `value` unsigned 32 bits, `quality` the octet as sent) |
+| `tariffs[]` | REE: the tariff information of a contract register (`register` 134..139): `current[]` (served to C_TA_VC_2) and `stored[]` (to C_TA_VM_2), records with the fields of the [ASDU document](CONTAINER_CONTRACT.md#iec-102-asdu-documents) of M_TA_VC_2 |
+
+`make validate` also checks: one list per record address and kind, period
+ends strictly ascending, total addresses unique within a period, tariff
+registers unique, no record that ends before it starts.
+
+### Station behaviour (IEC 102)
+
+The station is unbalanced, with a link address and a common address of two
+octets unless the link flags say otherwise. Its link state and class 2 queue
+start afresh with every connection; its clock lives as long as the process.
+It never sets ACD: every answer is class 2 data. It answers every request,
+in every state of the session: it does not make the reads depend on a login.
+
+| Request | Answer |
+|---------|--------|
+| Request status of link (function 9) | Status of link (function 11) |
+| Reset of remote link (function 0) | ACK (function 0); the queue is emptied |
+| User data, confirm (function 3) | ACK (function 0); queues the answers below |
+| Class 2 (function 11) | The next queued ASDU (function 8), or no data (function 9) |
+| A repeated frame (FCV set, the FCB of the previous frame) | The previous answer again |
+| C_AC_NA_2 (183) | Mirror with cause 7; with the P/N bit when the key is not `station.accessKey` |
+| C_FS_NA_2 (187) | Mirror with cause 7 |
+| C_RD_NA_2 (100) | P_MP_NA_2 (71), cause 5, one object: `station.product` |
+| C_TI_NA_2 (103) | M_TI_TA_2 (72), cause 5, one object: the clock as time b (SU and IV as last set, 0 for the fixture's clock) |
+| C_CS_TA_2 (181) | Sets the clock to the time b received (with its SU bit); mirror with cause 7 |
+| C_CI_NT_2 (122), C_CI_NU_2 (123) | The periods of the record address and kind whose `end` lies within the two times a (inclusive, comparing date and time to the minute, ignoring the flags); of each, the totals whose address lies within the first and last address. Mirror with cause 7, then one ASDU per period that has a total left (M_IT_TG_2 or M_IT_TK_2, cause 5, the record address, the totals in the fixture's order, then the period's `end` as time a), then the mirror with cause 10 |
+| C_TA_VC_2 (133) | Mirror with cause 7, one M_TA_VC_2 (135) per record of `current[]` (cause 5, record address the register, one object each, the reserved totals 0), mirror with cause 10 |
+| C_TA_VM_2 (134) | As C_TA_VC_2 with the records of `stored[]` whose `periodEnd` lies within the two times a, as M_TA_VM_2 (136) |
+
+Refusals: the request mirrored with the cause below and nothing else.
+
+| Situation | Cause |
+|-----------|-------|
+| The common address is not the station's | 16 |
+| C_CI_*: no totals on the record address | 16 |
+| C_CI_*: totals on the record address, but none of the kind | 14 |
+| C_CI_*: no period in the time range | 18 |
+| C_CI_*: periods, but no total in the address range | 17 |
+| C_TA_*: a register without tariff information | 16 |
+| C_TA_*: no record (stored values in the range) | 18 |
+| Any other type identification | 14 |
+
+The causes are those of the Beckhoff TS650x manual (section 9.1.11: 14 type
+not available, 16 unknown record address, 17 information object not
+available, 18 integration period not available); which cause a station uses
+in which situation is this contract's choice: no source we hold fixes it.
+
+### The IEC 102 baseline fixture
+
+`fixtures/iec102/baseline`: measuring point address 1, access key 7, the clock
+at 2026-01-15T10:20:30.500, product `{standard: 42, manufacturer: 33,
+product: 20261115}`.
+
+| Record | Kind | Periods (end) | Totals |
+|-------:|------|---------------|--------|
+| 11 | absolute (M_IT_TG_2) | 2026-01-01T01:00, 02:00, 03:00 | addresses 1..6 (REE: active import, export, reactive quadrants 1..4); quality 16 (bit 4) on address 1 of 02:00, 128 (IV) on address 6 of 03:00 |
+| 11 | incremental (M_IT_TK_2) | the same | the differences; 128 (IV) on address 3 of 02:00, 2 (bit 1) on address 1 of 03:00 |
+
+Tariff information of register 134 (contract I): two records of current
+values (addresses 1 and 2, period from 2026-01-01T00:00 to 2026-01-15T10:00)
+and two of stored values (address 1, the billing periods of November and
+December 2025; the active quality of November is 128).
 
 ## Adding a fixture
 

@@ -4,14 +4,17 @@
 Two layers, both required:
 
   1. The structural rules of fixtures/schema/iec60870-5-fixture.schema.json
-     (IEC 101, 102, 104) or fixtures/schema/iec60870-5-103-fixture.schema.json
+     (IEC 101, 104), fixtures/schema/iec60870-5-103-fixture.schema.json
      (IEC 103, whose objects are addressed by function type and information
-     number). They are checked with the `jsonschema` package when it is installed; CI installs
+     number) or fixtures/schema/iec60870-5-102-fixture.schema.json (IEC 102,
+     integration periods of integrated totals per record address). They are checked with the `jsonschema` package when it is installed; CI installs
      it, so a missing package is an error there (--require-schema).
   2. The cross-field rules a JSON Schema cannot express: unique addresses, and
      commands whose target exists and has the matching type (IEC 103: a
      command acts on the indication with its function type and information
-     number; a measurand of type 3 has at most four values).
+     number; a measurand of type 3 has at most four values; IEC 102: one list
+     per record address and kind, periods in ascending order, unique total
+     addresses in a period, unique tariff registers).
 
 The adapters apply the same rules when they load a fixture; this script makes
 a broken fixture fail before any image is built.
@@ -26,10 +29,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = ROOT / "fixtures" / "schema" / "iec60870-5-fixture.schema.json"
 SCHEMA_103 = ROOT / "fixtures" / "schema" / "iec60870-5-103-fixture.schema.json"
+SCHEMA_102 = ROOT / "fixtures" / "schema" / "iec60870-5-102-fixture.schema.json"
 
 # The largest information object address of a standard's fixtures: the IEC 101
 # fixtures use two-octet addresses (the default of --ioa-size).
-MAX_IOA = {"iec101": 65535, "iec102": 65535, "iec103": 255}
+MAX_IOA = {"iec101": 65535, "iec103": 255}
 
 # Command type -> the point type it acts on.
 COMMAND_TARGET = {
@@ -66,6 +70,32 @@ def semantic_errors_103(fx):
         commands.add(key)
         if key not in indications:
             errors.append(f"command {key[0]}/{key[1]}: no indication with this function type and information number")
+    return errors
+
+
+def semantic_errors_102(fx):
+    errors = []
+    lists = set()
+    for t in fx.get("totals", []):
+        key = (t.get("record"), t.get("kind"))
+        if key in lists:
+            errors.append(f"totals {key[0]}/{key[1]}: a second list of the same record address and kind")
+        lists.add(key)
+        ends = [p.get("end") for p in t.get("periods", [])]
+        if ends != sorted(set(ends)):
+            errors.append(f"totals {key[0]}/{key[1]}: period ends are not strictly ascending")
+        for p in t.get("periods", []):
+            addrs = [o.get("address") for o in p.get("totals", [])]
+            if len(addrs) != len(set(addrs)):
+                errors.append(f"totals {key[0]}/{key[1]} period {p.get('end')}: duplicate total address")
+    registers = set()
+    for t in fx.get("tariffs", []):
+        if t.get("register") in registers:
+            errors.append(f"tariff register {t.get('register')}: duplicate")
+        registers.add(t.get("register"))
+        for r in t.get("current", []) + t.get("stored", []):
+            if isinstance(r.get("periodStart"), str) and isinstance(r.get("periodEnd"), str) and r["periodStart"] > r["periodEnd"]:
+                errors.append(f"tariff register {t.get('register')}: a record ends before it starts")
     return errors
 
 
@@ -129,7 +159,7 @@ def main(argv):
         import jsonschema
 
         validators = {}
-        for key, path in (("default", SCHEMA), ("iec103", SCHEMA_103)):
+        for key, path in (("default", SCHEMA), ("iec103", SCHEMA_103), ("iec102", SCHEMA_102)):
             schema = json.loads(path.read_text())
             jsonschema.Draft202012Validator.check_schema(schema)
             validators[key] = jsonschema.Draft202012Validator(schema)
@@ -151,12 +181,16 @@ def main(argv):
         if fx is not None:
             validator = None
             if validators is not None:
-                validator = validators["iec103" if standard == "iec103" else "default"]
+                validator = validators[standard if standard in ("iec102", "iec103") else "default"]
             if validator is not None:
                 for e in sorted(validator.iter_errors(fx), key=lambda e: list(e.absolute_path)):
                     where = "/".join(str(x) for x in e.absolute_path) or "(root)"
                     errors.append(f"{where}: {e.message}")
-            if isinstance(fx, dict) and standard == "iec103":
+            if isinstance(fx, dict) and standard == "iec102":
+                errors.extend(semantic_errors_102(fx))
+                if path.parent.name != fx.get("name"):
+                    errors.append(f"name {fx.get('name')!r} does not match directory {path.parent.name!r}")
+            elif isinstance(fx, dict) and standard == "iec103":
                 errors.extend(semantic_errors_103(fx))
                 if path.parent.name != fx.get("name"):
                     errors.append(f"name {fx.get('name')!r} does not match directory {path.parent.name!r}")

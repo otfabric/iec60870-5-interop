@@ -13,9 +13,10 @@ REGISTRY  ?= ghcr.io/otfabric
 VERSION   ?= dev
 PLATFORMS ?= linux/amd64,linux/arm64
 
-# Registry of the base images (debian, maven, eclipse-temurin, golang). They
+# Registry of the base images (debian, maven, eclipse-temurin, golang, python). They
 # are pinned by digest in the Dockerfiles, so any mirror of Docker Hub's
-# official images gives the same build. The .NET images of the IEC 103
+# official images gives the same build (also the python image of the IEC 102
+# adapter and of the scripted meter, scripts/smoke-iec102.sh). The .NET images of the IEC 103
 # adapters come from mcr.microsoft.com, also pinned by digest. CI sets
 #   BASE_REGISTRY=mirror.gcr.io/library
 # because anonymous pulls from Docker Hub are rate limited per runner address.
@@ -36,10 +37,13 @@ IEC101_ADAPTERS ?= lib60870 cbsigma
 IEC104_ADAPTERS ?= lib60870 openmuc wendy512 cbsigma part5
 # IEC 103: vitusdong has both roles; the others are clients (control systems).
 IEC103_ADAPTERS ?= vitusdong goiecp5 ariec103 open103
+# IEC 102: clients only (controlling stations); smoke-tested against the
+# scripted meter tests/iec102/meter.py, which is not an implementation of IEC 102.
+IEC102_ADAPTERS ?= gisce
 # IEC 101/102/103 self-tests run once per link mode.
 LINK_MODES ?= unbalanced balanced
 
-IMAGES := $(addprefix iec101-,$(IEC101_ADAPTERS)) $(addprefix iec103-,$(IEC103_ADAPTERS)) $(addprefix iec104-,$(IEC104_ADAPTERS))
+IMAGES := $(addprefix iec101-,$(IEC101_ADAPTERS)) $(addprefix iec102-,$(IEC102_ADAPTERS)) $(addprefix iec103-,$(IEC103_ADAPTERS)) $(addprefix iec104-,$(IEC104_ADAPTERS))
 # Built and tested, not published: the licence of riclolsen/go-iecp5 is not
 # settled (versions.yaml, iec103-goiecp5).
 UNPUBLISHED ?=
@@ -49,9 +53,9 @@ image = $(REGISTRY)/iec60870-5-interop-$(1)
 std_of = $(word 1,$(subst -, ,$(1)))
 adapter_of = $(word 2,$(subst -, ,$(1)))
 
-export REGISTRY VERSION
+export REGISTRY VERSION BASE_REGISTRY
 
-.PHONY: publish-arch publish-manifest digests help all ci validate documents lint images smoke smoke-iec101 smoke-iec103 smoke-iec104 \
+.PHONY: publish-arch publish-manifest digests help all ci validate documents lint images smoke smoke-iec101 smoke-iec102 smoke-iec103 smoke-iec104 \
         interop interop-iec101 interop-iec103 interop-iec104 buildx buildx-setup publish capabilities clean FORCE
 FORCE:
 
@@ -112,11 +116,14 @@ image-%: FORCE ## Build one image, e.g. image-iec101-lib60870
 
 # ── Self-tests (images must be built) ─────────────────────────────────────────
 
-smoke: smoke-iec101 smoke-iec103 smoke-iec104 ## Container-contract smoke test of every image
+smoke: smoke-iec101 smoke-iec102 smoke-iec103 smoke-iec104 ## Container-contract smoke test of every image
 
 smoke-iec101: ## Smoke test every IEC 101 image in every link mode
 	@for m in $(LINK_MODES); do for a in $(IEC101_ADAPTERS); do \
 		LINK_MODE=$$m scripts/smoke.sh iec101 $$a || exit 1; done; done
+
+smoke-iec102: ## Smoke test every IEC 102 image (clients, against the scripted meter of tests/iec102)
+	@for a in $(IEC102_ADAPTERS); do scripts/smoke.sh iec102 $$a || exit 1; done
 
 smoke-iec103: ## Smoke test every IEC 103 image (unbalanced only; a client-only image runs against vitusdong's server)
 	@for a in $(IEC103_ADAPTERS); do scripts/smoke.sh iec103 $$a || exit 1; done

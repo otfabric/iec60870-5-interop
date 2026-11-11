@@ -69,6 +69,12 @@ for fixture in "${FIXTURES}"/*/fixture.json; do
 done
 expect_exit 1 "print-fixture of an unknown name" "${IMAGE}" print-fixture no-such-fixture
 
+if [[ "${STANDARD}" == iec102 ]]; then
+    # shellcheck source=scripts/smoke-iec102.sh
+    source "${SCRIPT_DIR}/smoke-iec102.sh"
+    finish
+    exit $?
+fi
 if [[ "${STANDARD}" == iec103 ]]; then
     # shellcheck source=scripts/smoke-iec103.sh
     source "${SCRIPT_DIR}/smoke-iec103.sh"

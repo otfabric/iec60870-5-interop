@@ -6,21 +6,21 @@
 
 Independent implementations of the IEC 60870-5 protocol family in
 containers, behind one command-line contract, with deterministic fixtures.
-A library or tool that implements IEC 101, 103 or 104 tests against these
+A library or tool that implements IEC 101, 102, 103 or 104 tests against these
 images; nothing in this repository knows about any such consumer.
 
-**Status: v0.1.0 released; v0.2.0 (IEC 103, contract 2.1) prepared, not released.**
+**Status: v0.2.1 released (IEC 101, 103, 104; contract 2.1); v0.3.0 (IEC 102, contract 2.2) prepared, not released.**
 
 | Standard | Images (`ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`) | Status |
 |----------|-------------------------------------------------------------------|--------|
 | IEC 60870-5-101 | `iec101-lib60870` (lib60870-C v2.4.1), `iec101-cbsigma` (cB-Sigma/iec60870 v0.3.0) | validated locally: smoke and the cross-stack run, unbalanced and balanced ([COMPATIBILITY](docs/COMPATIBILITY.md)) |
 | IEC 60870-5-104 | `iec104-lib60870`, `iec104-openmuc`, `iec104-wendy512`, `iec104-cbsigma`, `iec104-part5` (from iec104-interop 0.6.0) | experimental: built and self-tested here ([COMPATIBILITY](docs/COMPATIBILITY.md)), not yet released from this repository |
-| IEC 60870-5-102 | none | survey only ([REFERENCE_STACKS](docs/REFERENCE_STACKS.md)) |
+| IEC 60870-5-102 | `iec102-gisce` (gisce/iec870ree v0.14.1, REE profile, client) | experimental: smoke-tested against a scripted meter of this repository, which is not an implementation of IEC 102; there is no open controlled station ([COMPATIBILITY](docs/COMPATIBILITY.md#iec-60870-5-102)) |
 | IEC 60870-5-103 | `iec103-vitusdong` (vitusdong/iec103-dotnet v0.1.0, server and client), `iec103-ariec103` (masarray/ARIEC103, client), `iec103-open103` (XVincentX/Open103, client), `iec103-goiecp5` (riclolsen/go-iecp5 v0.4.7 cs103, client) | validated locally, unbalanced, every client against the one server; the server deviates from the standard in every checked reply (known bugs, [COMPATIBILITY](docs/COMPATIBILITY.md#iec-60870-5-103)) |
 
 ## How the serial standards are carried
 
-IEC 101 and 103 (and later 102) run over a serial line. Here the serial
+IEC 101, 102 and 103 run over a serial line. Here the serial
 byte stream (FT 1.2 frames, IEC 60870-5-2 link procedures) crosses one TCP
 connection unchanged, as through a terminal server. The server is the
 controlled station on port 2401; the client is the controlling station. No
@@ -28,7 +28,8 @@ IEC 104 APCI is involved. An adapter whose library only talks to a tty
 bridges a pseudo terminal to the socket inside the image, or gives the
 library a transport of its own over the socket (ARIEC103, Open103). IEC 103 is
 unbalanced only: the server is the protection equipment, the client the
-control system.
+control system. IEC 102 is unbalanced only too: the server is the meter, the
+client the controlling station; every open IEC 102 stack is a client.
 
 ## Quick start
 
@@ -52,7 +53,7 @@ docker stop station && docker network rm iec101-demo
 
 | Topic | Where |
 |-------|-------|
-| Container contract 2.1: commands, link flags, documents, exit codes | [docs/CONTAINER_CONTRACT.md](docs/CONTAINER_CONTRACT.md) |
+| Container contract 2.2: commands, link flags, documents, exit codes | [docs/CONTAINER_CONTRACT.md](docs/CONTAINER_CONTRACT.md) |
 | What each image can do | [docs/CAPABILITIES.md](docs/CAPABILITIES.md) |
 | Fixtures and station behaviour | [docs/FIXTURES.md](docs/FIXTURES.md) |
 | Self-test results, exact counts | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) |
@@ -66,16 +67,18 @@ docker stop station && docker network rm iec101-demo
 ```text
 adapters/<standard>/<stack>/   one image each (GPL-3.0-or-later, adapters/LICENSE)
 fixtures/<standard>/<name>/    fixture.json, baked into the images of that standard
-fixtures/schema/               the fixture schemas (IEC 101/102/104, and IEC 103)
+fixtures/schema/               the fixture schemas (IEC 101/104, IEC 102, IEC 103)
 schemas/                       capability, client result and interop-result-v1 schemas
 scripts/                       smoke.sh, interop.sh <standard> ..., results writer, validators
-tests/<standard>/              cases.tsv, known-bugs.tsv (IEC 104 also feature- and secure-cases)
+tests/<standard>/              cases.tsv, known-bugs.tsv (IEC 104 also feature- and secure-cases;
+                               IEC 102 the scripted meter meter.py, test-only)
 reports/                       interop-result-v1 results.json and the documents of the last kept run
 ```
 
 ## Licence
 
 The repository is MIT ([LICENSE](LICENSE)). The adapter programs under
-`adapters/` link GPL-3.0 libraries and are GPL-3.0-or-later
+`adapters/` link GPL-3.0 libraries (or, for IEC 102, import the AGPL-3.0
+gisce/iec870ree) and are GPL-3.0-or-later
 ([adapters/LICENSE](adapters/LICENSE), [licenses/GPL-3.0.txt](licenses/GPL-3.0.txt)).
 A consumer talks to the images over TCP and is not affected by their licence.

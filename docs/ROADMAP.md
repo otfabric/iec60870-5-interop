@@ -18,9 +18,18 @@ assessed in [REFERENCE_STACKS.md](REFERENCE_STACKS.md). Nothing here is done.
 
 ## IEC 60870-5-102
 
-- gisce/iec870ree (AGPL-3.0, Python, REE profile, master only) as the
-  controlling-station oracle; the controlled-station role has no open peer.
-- Its own fixture, cases and contract section (a minor bump).
+Contract 2.2 has the IEC 102 section, the baseline fixture and the client
+image `iec102-gisce` (gisce/iec870ree), smoke-tested against a scripted
+meter. Next:
+
+1. **A controlled station.** None is open (REFERENCE_STACKS.md); until one
+   is, `iec102-gisce` stays experimental and there is no cross-stack run.
+2. More of gisce: single points by dates (C_SP_NB_2, events), blocks of
+   totals (C_CB_UN_2), configuration (C_RM_NA_2), contracted powers
+   (C_PC_NA_2), special days (C_DF_NA_2), as operations and fixture parts.
+3. The standard read commands other than C_CI_NT_2 and C_CI_NU_2 (C_CI_NA_2
+   .. C_CI_NS_2): no open client sends them.
+4. One-octet link and common addresses: gisce has two octets only.
 
 ## IEC 60870-5-103
 

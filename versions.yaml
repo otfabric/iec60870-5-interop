@@ -11,9 +11,9 @@
 #         validated    smoke and the cross-stack run passed locally, results in
 #                      docs/COMPATIBILITY.md (and reports/ when kept)
 
-interop_version: "0.2.1"
-contract_version: "2.1"        # docs/CONTAINER_CONTRACT.md
-fixture_schema: "1.0"          # fixtures/schema/iec60870-5-fixture.schema.json, iec60870-5-103-fixture.schema.json
+interop_version: "0.3.0"
+contract_version: "2.2"        # docs/CONTAINER_CONTRACT.md
+fixture_schema: "1.0"          # fixtures/schema/iec60870-5-fixture.schema.json, iec60870-5-102-fixture.schema.json, iec60870-5-103-fixture.schema.json
 
 standards:
   iec101:
@@ -81,6 +81,34 @@ implementations:
     language: "Java"
     independent_engine: true
     note: "Native 101-over-TCP. No adapter yet (docs/ROADMAP.md)."
+
+  # ---- IEC 60870-5-102 (contract 2.2) ----
+  # No open controlled station (meter) exists, so there is no cross-stack
+  # run: the client is smoke-tested against tests/iec102/meter.py, a scripted
+  # meter of this repository that is not an implementation of IEC 102. Hence
+  # experimental, whatever the smoke test says (docs/COMPATIBILITY.md).
+  iec102-gisce:
+    standard: iec102
+    status: experimental
+    upstream: "gisce/iec870ree"
+    repository: "https://github.com/gisce/iec870ree"
+    version: "v0.14.1"           # latest release (tag and PyPI 0.14.1 of this commit)
+    revision: "993242daa3e998c9d86948881d97835438d8bef3"
+    license: "AGPL-3.0"
+    language: "Python"
+    independent_engine: true
+    roles: [client]
+    link_modes: [unbalanced]
+    note: >-
+      Controlling station of the Spanish REE profile (session with access
+      key, integrated totals, clock, product identification, tariff
+      information) with a link address and a common address of two octets.
+      Derived from javierdelapuente/reeprotocol (one lineage, no second
+      adapter). The adapter supplies a TCP physical layer of its own (the
+      library's iec870ree.ip waits 5 s after connecting and never notices a
+      closed connection) and records the frames; the library cannot parse the
+      single character E5h (it raises on the start octet), so it needs a
+      station that answers with fixed frames.
 
   # ---- IEC 60870-5-103 (contract 2.1) ----
   # Every reference server below deviates from IEC 60870-5-103 on the wire;
@@ -238,6 +266,12 @@ implementations:
     roles: [server, client]
 
 dependencies:
+  # iec102 gisce (PyPI, adapters/iec102/gisce/requirements.txt with hashes):
+  pypi_bitstring: "3.1.5"          # MIT
+  pypi_six: "1.17.0"               # MIT
+  pypi_pytz: "2026.6"              # MIT
+  pypi_python_dateutil: "4.0.0"    # Apache-2.0 AND BSD-3-Clause
+  pypi_setuptools: "84.2.1"        # MIT, build only (bitstring is a source archive)
   nuget_system_io_ports: "8.0.0"   # iec103 vitusdong and ariec103, MIT; packages.lock.json pins the content hash
   nuget_system_text_encoding_codepages: "8.0.0"   # iec103 vitusdong, MIT
   go_bug_st_serial: "v1.6.4"   # iec103 goiecp5 (through cs101), BSD-3-Clause
@@ -247,6 +281,8 @@ dependencies:
   mbedtls_sha256: "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6"
 
 base_images:
+  # Python image of the IEC 102 adapter and of the scripted meter, recorded 2026-11-11.
+  python_3_12_slim_bookworm: "docker.io/library/python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df"
   # .NET 8 images of the IEC 103 adapters (mcr.microsoft.com), recorded 2026-11-11.
   dotnet_sdk_8_bookworm_slim: "mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5"
   dotnet_runtime_8_bookworm_slim: "mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim@sha256:21b0f8ba67bef2f121781d17a8e21956aeaa2d8da8e4b5db0da1ea8f91e2b6a1"
@@ -259,6 +295,7 @@ base_images:
 images:
   iec101-lib60870: "ghcr.io/otfabric/iec60870-5-interop-iec101-lib60870"
   iec101-cbsigma: "ghcr.io/otfabric/iec60870-5-interop-iec101-cbsigma"
+  iec102-gisce: "ghcr.io/otfabric/iec60870-5-interop-iec102-gisce"
   iec103-vitusdong: "ghcr.io/otfabric/iec60870-5-interop-iec103-vitusdong"
   iec103-goiecp5: "ghcr.io/otfabric/iec60870-5-interop-iec103-goiecp5"    # not published (licence)
   iec103-ariec103: "ghcr.io/otfabric/iec60870-5-interop-iec103-ariec103"

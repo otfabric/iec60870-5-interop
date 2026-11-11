@@ -18,6 +18,29 @@ section per version, newest first, each ending with a `---` line.
 
 ---
 
+## v0.3.0
+
+**Date:** not released (prepared 2026-11-11)
+**Previous release:** v0.2.1
+
+### Added
+
+- Container contract 2.2 (docs/CONTAINER_CONTRACT.md, section IEC 102): IEC 60870-5-102 over the FT 1.2 stream on one TCP connection, port 2401, unbalanced only, the integrated total station (meter) as server and the controlling station as client. Link address and common address (measuring point address) of two octets by default (`--link-address-size`, `--ca-size`; `linkAddressSizes`, `caSizes` in capability documents), `--profile standard|ree` and `--access-key`: with the REE profile a session (C_AC_NA_2, C_FS_NA_2) around every operation, reported as `session: {login, logout}`, and the error `login-refused`. Client operations `connect`, `read-totals` (C_CI_NT_2 absolute / C_CI_NU_2 incremental: `--kind`, `--record`, `--from`, `--to`, `--first`, `--last`), `read-time` (C_TI_NA_2), `read-product` (C_RD_NA_2), and of the REE profile `set-time` (C_CS_TA_2, `--time`) and `read-tariff` (C_TA_VC_2 / C_TA_VM_2, `--register`, `--from`, `--to`). ASDU documents of IEC 102: `record`, the station's local times a and b with `su` and `timeInvalid`, integrated totals with the quality octet, product identification, tariff records; confirmations with the refusal causes 13..18; the server events of IEC 102; the features `integratedTotals`, `readTime`, `setTime`, `productIdentification`, `tariffInformation`, `reeSession`.
+- `fixtures/iec102/baseline` (an electricity meter: measuring point address 1, access key 7, a clock that stands still until set, three hourly periods of six integrated totals on record 11 as absolute values and as increments with quality bits set, tariff information of register 134: two records of current and two of stored values) with its own schema, `fixtures/schema/iec60870-5-102-fixture.schema.json`, and rules in `scripts/validate-fixtures.py`; docs/FIXTURES.md, "IEC 102", defines the station behaviour and the causes of refusal.
+- Image `iec102-gisce`: gisce/iec870ree v0.14.1 (`993242da`, AGPL-3.0, Python), the controlling station of the Spanish REE profile, client only. The library is fetched by commit and shipped as source; its dependencies (bitstring 3.1.5, six, pytz, python-dateutil) are installed by version and hash; the adapter gives it a TCP transport of its own. Status experimental: there is no open IEC 102 controlled station, so there is no cross-stack run.
+- `scripts/smoke-iec102.sh` and `make smoke-iec102`: the contract surface and every operation against `tests/iec102/meter.py`, a scripted meter written in this repository from the contract and the fixture. **It is not an independent implementation of IEC 102**: a pass shows that the image keeps the contract and reads the fixture's values, not that either is right about IEC 102. `tests/iec102/known-bugs.tsv` (empty).
+- The client result and capability schemas take the IEC 102 fields.
+
+### Changed
+
+- `make` exports `BASE_REGISTRY` to the scripts (the scripted meter's Python image comes from it, as the base images of the builds do).
+
+### Verified
+
+Locally on linux/arm64 (Docker on macOS), 2026-11-11: smoke of `iec102-gisce` against the scripted meter, 61 pass, 0 fail; its 18 client result documents and its capability document validate against `schemas/`. IEC 101 (both link modes) and IEC 103 smoke unchanged. Nothing ran on amd64 or in CI.
+
+---
+
 ## v0.2.1
 
 **Date:** 2026-11-11
