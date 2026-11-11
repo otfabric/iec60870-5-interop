@@ -1,1 +1,1 @@
-{"adapter":"wendy512","asdus":[],"confirmations":[],"connected":true,"elapsedMs":3005,"error":{"code":"tls-failed","message":"no TLS session with the station"},"ok":false,"operation":"counter-interrogate","schemaVersion":"1.0","startdtConfirmed":false,"terminated":false,"tls":false}
+{"adapter":"wendy512","asdus":[],"confirmations":[],"connected":true,"elapsedMs":3010,"error":{"code":"tls-failed","message":"no TLS session with the station"},"ok":false,"operation":"counter-interrogate","schemaVersion":"1.0","startdtConfirmed":false,"terminated":false,"tls":false}

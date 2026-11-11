@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","adapter":"lib60870","operation":"test-command","ok":true,"error":null,"connected":true,"confirmations":[{"cot":7,"negative":false}],"terminated":false,"asdus":[{"type":"C_TS_NA_1","typeId":104,"cot":7,"negative":false,"test":false,"originator":0,"commonAddress":1,"sequence":false,"count":1,"objects":[{"ioa":0,"fbp":21930}]}],"elapsedMs":118}
