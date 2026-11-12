@@ -367,6 +367,11 @@ server, which accepts them; a strict station would not:
 
 - vitusdong's client sends ASDU 6 with FUN 0 (the standard: 255):
   `68 0F 0F 68 53 01 06 81 08 01 00 00 39 30 23 0F 09 0A 1A AC 16`.
+- vitusdong's server answers a generic write to the read-only entry 1.1 with
+  GRC 7 where the fixture's station answers 8 (data
+  `010101010116010107`): seen only when vitusdong's own pairing was compared
+  with OT Fabric's own image (contract 2.3, 2026-11-12), and covered there by
+  `vitusdong-generic-command-inf`.
 - The ArIEC103 slave simulator (not an image; run over TCP for the survey)
   answers a request of the status of link with ACK, ends every interrogation
   with SCN 0, sends measurands as ASDU 9 with one value and a stray octet, and
@@ -402,3 +407,26 @@ they are not passes.
 
 Carried over from iec104-interop, where it was first found; this run
 confirms it still reproduces with the same pin.
+
+## OT Fabric's own images
+
+`iec<std>-otfabric` (own/go-iec60870-5, go-iec60870-5 v0.5.1 at `40002fc`,
+not references: `independent: false`) against the references of
+iec60870-5-interop v0.4.0, `make -f own/go-iec60870-5/Makefile images smoke-all
+interop-all VERSION=v0.4.0`, locally on linux/arm64 (Docker for macOS),
+2026-11-12. The cross-stack runs are gated (`GATE=otfabric`): only the
+pairings with the own image, in both roles; the references among themselves
+are the runs above. None of this is independent evidence for go-iec60870-5;
+it shows that the images keep the contract and agree with the references.
+
+| Standard | Smoke | Cross-stack |
+|----------|-------|-------------|
+| IEC 101 | 48 pass unbalanced, 48 balanced | unbalanced 830 pass, 0 fail, 27 unsupported; balanced 759 pass, 0 fail, 64 known-difference (`digitalpetri-balanced-server-no-link-reset`) |
+| IEC 102 | 115 pass | 73 pass, 0 fail: gisce and otfabric clients against the otfabric station (17 cases, agreement, 22 value checks). The first IEC 102 run here against a station that is not the scripted meter |
+| IEC 103 | 52 pass | 120 pass, 0 fail, 40 known-difference, 35 unsupported. With a station other than vitusdong the entries of `tests/iec103/known-bugs-consumer.tsv` reproduce (vitusdong client and server: generic INF, ASDU 23, SOF bits, disturbance procedure; Open103 ASDU 30 NFE) |
+| IEC 104 | 59 pass | 1534 pass, 0 fail, 9 known-difference (`openmuc-read-command`), 159 unsupported (features the references lack); secure, TLS, file and redundancy cases ran against otfabric and cbsigma |
+
+The library's own interop suites (go-iec60870-5 v0.5.0, `go test -tags
+interop`) with the own image in place of a reference passed as well: IEC 101
+all three tests, IEC 102 18 of 18, IEC 103 4 tests and 38 subtests, IEC 104
+175 tests and subtests.

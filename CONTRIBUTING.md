@@ -66,6 +66,8 @@ See [docs/FIXTURES.md](docs/FIXTURES.md#adding-a-fixture).
 4. `scripts/smoke.sh <standard> <name>` must pass, then `scripts/interop.sh <standard> <the other adapters> <name>` (IEC 101: with `LINK_MODE=unbalanced` and `LINK_MODE=balanced`). Set its status in versions.yaml: `experimental` until both pass, `validated` once they pass and the counts are in docs/COMPATIBILITY.md.
 5. Add it to `IEC101_ADAPTERS` or `IEC104_ADAPTERS` in the Makefile, to the workflows, `versions.yaml`, `scripts/check-versions.sh`, the notices and the documentation tables.
 
+OT Fabric's own images are not adapters of this list: they live in `own/go-iec60870-5/` and are built and published by hand (own/go-iec60870-5/README.md).
+
 Do not build a shared adapter framework. The adapters share a contract, not code.
 
 ## Style

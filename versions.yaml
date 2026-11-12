@@ -11,7 +11,7 @@
 #         validated    smoke and the cross-stack run passed locally, results in
 #                      docs/COMPATIBILITY.md (and reports/ when kept)
 
-interop_version: "0.4.0"
+interop_version: "0.5.0"
 contract_version: "2.3"        # docs/CONTAINER_CONTRACT.md
 fixture_schema: "1.0"          # fixtures/schema/iec60870-5-fixture.schema.json, iec60870-5-102-fixture.schema.json, iec60870-5-103-fixture.schema.json
 
@@ -276,6 +276,24 @@ implementations:
     independent_engine: true
     roles: [server, client]
 
+# OT Fabric's own stack (ADR-0012, own/go-iec60870-5/README.md): not a
+# reference, not in a release or manifest.json, never pinned here. The
+# "Own stack (go-iec60870-5)" workflow builds it by hand from the latest
+# go-iec60870-5 release; own/go-iec60870-5/go.mod is only a starting point.
+own_implementations:
+  otfabric:
+    upstream: "go-iec60870-5"
+    repository: "https://github.com/otfabric/go-iec60870-5"
+    artifact: "go:github.com/otfabric/go-iec60870-5"
+    version: "latest release, resolved when the images are built by hand"
+    license: "MIT"
+    language: "Go"
+    independent_engine: false
+    standards: [iec101, iec102, iec103, iec104]
+    roles: [server, client]
+    images: "ghcr.io/otfabric/iec60870-5-interop-<standard>-otfabric"
+    build: "own/go-iec60870-5"
+
 dependencies:
   # iec102 gisce (PyPI, adapters/iec102/gisce/requirements.txt with hashes):
   pypi_bitstring: "3.1.5"          # MIT
@@ -299,6 +317,7 @@ base_images:
   dotnet_sdk_8_bookworm_slim: "mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5"
   dotnet_runtime_8_bookworm_slim: "mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim@sha256:21b0f8ba67bef2f121781d17a8e21956aeaa2d8da8e4b5db0da1ea8f91e2b6a1"
   # Digests recorded 2026-10-09 (iec104-interop); the Dockerfiles pin these by digest.
+  # golang and debian are also the base images of own/go-iec60870-5/Dockerfile.
   debian_trixie_slim: "docker.io/library/debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f"
   maven_3_9_temurin_25: "docker.io/library/maven:3.9-eclipse-temurin-25@sha256:93b8a14ea2f412782e4e842651273b4d903e35cc496284f178fbbe2d67d00976"
   golang_1_27_2_trixie: "docker.io/library/golang:1.27.2-trixie@sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d"
@@ -310,7 +329,7 @@ images:
   iec101-digitalpetri: "ghcr.io/otfabric/iec60870-5-interop-iec101-digitalpetri"
   iec102-gisce: "ghcr.io/otfabric/iec60870-5-interop-iec102-gisce"
   iec103-vitusdong: "ghcr.io/otfabric/iec60870-5-interop-iec103-vitusdong"
-  iec103-goiecp5: "ghcr.io/otfabric/iec60870-5-interop-iec103-goiecp5"    # not published (licence)
+  iec103-goiecp5: "ghcr.io/otfabric/iec60870-5-interop-iec103-goiecp5"    # published since v0.2.1 (maintainer decision, docs/REFERENCE_STACKS.md)
   iec103-ariec103: "ghcr.io/otfabric/iec60870-5-interop-iec103-ariec103"
   iec103-open103: "ghcr.io/otfabric/iec60870-5-interop-iec103-open103"
   iec104-lib60870: "ghcr.io/otfabric/iec60870-5-interop-iec104-lib60870"

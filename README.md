@@ -9,7 +9,7 @@ containers, behind one command-line contract, with deterministic fixtures.
 A library or tool that implements IEC 101, 102, 103 or 104 tests against these
 images; nothing in this repository knows about any such consumer.
 
-**Status: v0.4.0 (IEC 101, 102, 103, 104; contract 2.3: third IEC 101 stack, field sizes, IEC 103 generic services and disturbance data).**
+**Status: v0.5.0 (IEC 101, 102, 103, 104; contract 2.3; OT Fabric's own images for all four standards, the first IEC 102 station).**
 
 | Standard | Images (`ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`) | Status |
 |----------|-------------------------------------------------------------------|--------|
@@ -49,6 +49,17 @@ docker stop station && docker network rm iec101-demo
 `docker compose up -d --wait` starts every server on loopback ports
 (`compose.yaml`).
 
+## OT Fabric's own stack
+
+`ghcr.io/otfabric/iec60870-5-interop-<standard>-otfabric` (`iec101`, `iec102`,
+`iec103`, `iec104`) is go-iec60870-5 behind the same contract, both roles, so
+you can test your stack against ours the way we test ours against yours. The
+IEC 102 image is the first IEC 102 controlled station here. Despite the name
+it shares with the reference images, it is not an independent implementation
+and not part of a release of this repository, so its tags are go-iec60870-5
+versions and `manifest.json` does not list it: see
+[own/go-iec60870-5/README.md](own/go-iec60870-5/README.md).
+
 ## Documents
 
 | Topic | Where |
@@ -73,6 +84,7 @@ schemas/                       capability, client result and interop-result-v1 s
 scripts/                       smoke.sh, interop.sh <standard> ..., results writer, validators
 tests/<standard>/              cases.tsv, known-bugs.tsv (IEC 104 also feature- and secure-cases;
                                IEC 102 the scripted meter meter.py, test-only)
+own/go-iec60870-5/             OT Fabric's own stack (MIT, ADR-0012), not a reference: own/go-iec60870-5/README.md
 reports/                       interop-result-v1 results.json and the documents of the last kept run
 ```
 

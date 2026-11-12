@@ -412,9 +412,11 @@ contract's, not a claim about the standard.
 
 Every open IEC 102 stack is a controlling station, so an IEC 102 image may be
 a client only (`roles.server` false): `server` is then a usage error (exit 2)
-and the image has no health check or default server. No image of this
-version has a server; the [server section](#iec-102-server) says what one must
-do.
+and the image has no health check or default server. No reference image has
+a server; OT Fabric's own image `iec102-otfabric` (`own/`, not a reference) has
+one, and the [server section](#iec-102-server) says what it must do. A station
+answers a request when the controlling station fetches the answer (class 2),
+so its events may come at that time rather than when the request arrived.
 
 ### IEC 102 link
 
@@ -566,7 +568,7 @@ false except `clockSync` (`set-time`); `unbalancedMode` is true and
 
 | Item | Value |
 |------|-------|
-| Image | `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`; OT Fabric's own stack is the stack `otfabric` (`own/`, not in this version) |
+| Image | `ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`; OT Fabric's own stack is the stack `otfabric` (`own/go-iec60870-5/`, not a reference and not in a release: its tags are go-iec60870-5 versions) |
 | Entrypoint | `iec60870-5-interop` (`/usr/local/bin/iec60870-5-interop`) |
 | Default command | `server` (`print-capabilities` for an IEC 102 or IEC 103 image that is a client only) |
 | Port | 2404/tcp (IEC 104), 2401/tcp (IEC 101, 102, 103); not exposed by a client-only image |

@@ -1,0 +1,37 @@
+# Self-test cases of IEC 60870-5-102 for scripts/interop.sh, against the
+# baseline fixture (fixtures/iec102/baseline), unbalanced, every client with
+# every server: the operations of the smoke test's checks against the scripted
+# meter (scripts/smoke-iec102.sh). scripts/interop-iec102.sh then compares the
+# values of the documents with the fixture.
+#
+# Columns, separated by tabs, as tests/iec101/cases.tsv:
+#   1  id      stable dotted scenario id of results.json (prefixed with
+#              iec102.unbalanced.); never change it
+#   2  state   "ro" (servers are shared) or "rw" (a freshly started server)
+#   3  exit    expected exit code of the client
+#   4  summary expected outcome: ok, error code, confirmations (cause, "n" when
+#              negative), termination, and type/cause of every received ASDU
+#   5  needs   "-", or "server:<feature>" and "client:<feature>", separated by commas
+#   6  operation and its flags, as passed to "client"
+#
+# The access key of the fixture is 7. The REE operations run in a session: the
+# mirrors of C_AC_NA_2 and C_FS_NA_2 are in the ASDUs. A wrong key is refused
+# with the P/N bit (cause 7, the summary shows the cause only) and nothing else
+# is sent. set-time changes the station's clock, so it gets a server of its own.
+case.connect	ro	0	ok=true error=- conf= term=false asdus=	-	connect
+case.connect-ree	ro	0	ok=true error=- conf= term=false asdus=C_AC_NA_2/7,C_FS_NA_2/7	server:reeSession,client:reeSession	connect --profile ree --access-key 7
+case.login-refused	ro	1	ok=false error=login-refused conf= term=false asdus=C_AC_NA_2/7	server:reeSession,client:reeSession	connect --profile ree --access-key 8
+case.link-init-timeout	ro	3	ok=false error=link-init-timeout conf= term=false asdus=	-	read-time --link-address 9 --timeout-ms 1500
+case.read-product	ro	0	ok=true error=- conf= term=false asdus=P_MP_NA_2/5	server:productIdentification,client:productIdentification	read-product
+case.read-time-ree	ro	0	ok=true error=- conf= term=false asdus=C_AC_NA_2/7,M_TI_TA_2/5,C_FS_NA_2/7	server:readTime,client:readTime,server:reeSession,client:reeSession	read-time --profile ree --access-key 7
+case.read-totals-absolute	ro	0	ok=true error=- conf=7 term=true asdus=C_CI_NT_2/7,M_IT_TG_2/5,M_IT_TG_2/5,M_IT_TG_2/5,C_CI_NT_2/10	server:integratedTotals,client:integratedTotals	read-totals --from 2026-01-01T00:00 --to 2026-01-01T05:00
+case.read-totals-incremental-ree	ro	0	ok=true error=- conf=7 term=true asdus=C_AC_NA_2/7,C_CI_NU_2/7,M_IT_TK_2/5,M_IT_TK_2/5,M_IT_TK_2/5,C_CI_NU_2/10,C_FS_NA_2/7	server:integratedTotals,client:integratedTotals,server:reeSession,client:reeSession	read-totals --kind incremental --from 2026-01-01T00:00 --to 2026-01-01T05:00 --profile ree --access-key 7
+case.read-totals-subset	ro	0	ok=true error=- conf=7 term=true asdus=C_CI_NU_2/7,M_IT_TK_2/5,M_IT_TK_2/5,C_CI_NU_2/10	server:integratedTotals,client:integratedTotals	read-totals --kind incremental --from 2026-01-01T02:00 --to 2026-01-01T03:00 --first 1 --last 3
+case.read-totals-no-period	ro	1	ok=false error=negative-confirmation conf=18n term=false asdus=C_CI_NT_2/18	server:integratedTotals,client:integratedTotals	read-totals --from 2027-01-01T00:00 --to 2027-01-01T05:00
+case.read-totals-unknown-record	ro	1	ok=false error=negative-confirmation conf=16n term=false asdus=C_CI_NT_2/16	server:integratedTotals,client:integratedTotals	read-totals --record 12 --from 2026-01-01T00:00 --to 2026-01-01T05:00
+case.read-totals-no-total	ro	1	ok=false error=negative-confirmation conf=17n term=false asdus=C_CI_NT_2/17	server:integratedTotals,client:integratedTotals	read-totals --first 7 --last 8 --from 2026-01-01T00:00 --to 2026-01-01T05:00
+case.read-totals-other-common-address	ro	1	ok=false error=negative-confirmation conf=16n term=false asdus=C_CI_NT_2/16	server:integratedTotals,client:integratedTotals	read-totals --common-address 2 --from 2026-01-01T00:00 --to 2026-01-01T05:00
+case.read-tariff-current	ro	0	ok=true error=- conf=7 term=true asdus=C_AC_NA_2/7,C_TA_VC_2/7,M_TA_VC_2/5,M_TA_VC_2/5,C_TA_VC_2/10,C_FS_NA_2/7	server:tariffInformation,client:tariffInformation	read-tariff --profile ree --access-key 7
+case.read-tariff-stored	ro	0	ok=true error=- conf=7 term=true asdus=C_AC_NA_2/7,C_TA_VM_2/7,M_TA_VM_2/5,M_TA_VM_2/5,C_TA_VM_2/10,C_FS_NA_2/7	server:tariffInformation,client:tariffInformation	read-tariff --from 2025-11-15T00:00 --to 2026-01-01T00:00 --profile ree --access-key 7
+case.read-tariff-unknown-register	ro	1	ok=false error=negative-confirmation conf=16n term=false asdus=C_AC_NA_2/7,C_TA_VC_2/16,C_FS_NA_2/7	server:tariffInformation,client:tariffInformation	read-tariff --register 135 --profile ree --access-key 7
+case.set-time	rw	0	ok=true error=- conf=7 term=false asdus=C_AC_NA_2/7,C_CS_TA_2/7,C_FS_NA_2/7	server:setTime,client:setTime	set-time --time 2026-02-03T04:05:06.789 --profile ree --access-key 7

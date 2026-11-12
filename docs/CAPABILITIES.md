@@ -161,8 +161,8 @@ session is still open after it.
 ¹⁴ part5 v0.3.0 has no notion of a redundancy group, and its client side is
 one session per connection with no hook to run two.
 
-OT Fabric's own image (`own/go-iec104`, not a reference) declares every feature
-in this table.
+OT Fabric's own image `iec104-otfabric` (`own/go-iec60870-5`, not a reference)
+declares every feature in this table.
 
 A capability is a property of the adapter and of the upstream version in the
 image. The self-tests read it from the image and skip what a pairing lacks
@@ -216,8 +216,11 @@ link address field of another size, not with another address.
 
 ## Features of the IEC 102 images
 
-One image, a client (controlling station) only: there is no open IEC 102
-controlled station ([REFERENCE_STACKS.md](REFERENCE_STACKS.md)).
+One reference image, a client (controlling station) only: there is no open IEC
+102 controlled station ([REFERENCE_STACKS.md](REFERENCE_STACKS.md)). OT
+Fabric's own image `iec102-otfabric` (not a reference, [below](#ot-fabrics-own-images))
+has a station, and gisce's results against it are the only cross-stack IEC 102
+runs here.
 
 | Item | gisce |
 |------|:-----:|
@@ -357,6 +360,25 @@ with `gi: false` is left out of its station model. It finds the station by the
 link address and does not check the common address of an ASDU, so
 `--common-address` of the server must equal `--link-address` (a usage error
 otherwise).
+
+## OT Fabric's own images
+
+`iec101-otfabric`, `iec102-otfabric`, `iec103-otfabric` and `iec104-otfabric`
+are go-iec60870-5 behind the contract (`own/go-iec60870-5`, ADR-0012), with
+`upstream.independentEngine: false`. They are not references: not in a
+release or `manifest.json`, and their results never count as an independent
+implementation. Each has both roles. What each declares is the standard's
+full set of this contract, apart from the features of other standards:
+
+| Image | Declares |
+|-------|----------|
+| `iec101-otfabric` | unbalanced and balanced; every field size (link address 0, 1, 2; cause 1, 2; common address 1, 2; object address 1, 2, 3); `unbalancedCommonAddress`, `distinctBalancedAddresses`; the 8 point types, 6 command types and 8 operations |
+| `iec102-otfabric` | link address and common address of 1 or 2 octets; profiles standard and ree; every IEC 102 feature and operation |
+| `iec103-otfabric` | every IEC 103 feature, including `broadcastClockSync`, `genericServices`, `disturbanceList`, `disturbanceData` and `disturbanceDataServer` (the fixture's records, tags and values) |
+| `iec104-otfabric` | every feature of the IEC 104 table |
+
+How they differ from the references in detail is in
+[own/go-iec60870-5/README.md](../own/go-iec60870-5/README.md).
 
 ## Rules for consumers
 

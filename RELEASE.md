@@ -18,6 +18,31 @@ section per version, newest first, each ending with a `---` line.
 
 ---
 
+## v0.5.0
+
+**Date:** unreleased
+**Previous release:** v0.4.0
+
+### Added
+
+- OT Fabric's own stack behind the contract (ADR-0012): `own/go-iec60870-5/`, one Go module with a main package per standard, and the images `ghcr.io/otfabric/iec60870-5-interop-<standard>-otfabric` for IEC 101, 102, 103 and 104, each with both roles. They are built from the latest go-iec60870-5 release (no pin here) by the manual workflow **Own stack (go-iec60870-5)** (`own-go-iec60870-5.yml`), tested with the self-tests and references of the latest harness release on amd64 and arm64, and published as `:<go-iec60870-5 version>` and `:latest` from `main` only. Not references: `independentEngine` false, not in this release or `manifest.json`. `iec102-otfabric` is the first IEC 102 controlled station of the harness. See own/go-iec60870-5/README.md for how each differs from the references.
+- IEC 102 cross-stack run: `scripts/interop.sh iec102 <adapters>` with `tests/iec102/cases.tsv` (17 operations) and `scripts/interop-iec102.sh` (value checks against the fixture, set-time read back, the station's events), for any image with a station. The smoke test of an IEC 102 image with a server checks the server section of the contract (usage errors, invalid fixtures, ready and stopped events, the image's own client against its station, one-octet sizes when listed); the meter checks still run for every client.
+- `GATE=<adapter>` (`scripts/lib.sh`): the cross-stack runs only the pairings with that adapter; a waiver of another adapter that does not reproduce is then not stale.
+- CI job **Own stack module**: gofmt, go vet and `go test -race` of `own/go-iec60870-5` on its go.mod starting point.
+
+### Changed
+
+- `scripts/interop.sh` applies `tests/<standard>/known-bugs-consumer.tsv` like `known-bugs.tsv`, but never reports one of its entries stale: they reproduce only against a station or control system other than the references, as the own IEC 103 image now is. The IEC 103 entries name the role they apply to (`vitusdong@client`, `vitusdong@server`, `open103@client`); a consumer that matches adapter names exactly strips the role.
+- Contract 2.3, wording only: the IEC 102 section says the own image has a server and that a station's events may come when the controlling station fetches the answer.
+- versions.yaml: `own_implementations.otfabric`; `interop_version` 0.5.0. The `iec103-goiecp5` comments in versions.yaml and the Makefile say it is published (since v0.2.1), as docs/REFERENCE_STACKS.md does.
+- AGENTS.md rule 1 names `own/go-iec60870-5/` and its workflow as the one exception; README, THIRD_PARTY_NOTICES.md, docs/CAPABILITIES.md and docs/COMPATIBILITY.md describe the own images.
+
+### Verified
+
+See docs/COMPATIBILITY.md ("OT Fabric's own images"). Locally on linux/arm64 (Docker on macOS), 2026-11-12, go-iec60870-5 v0.5.1 against the v0.4.0 references, gated: IEC 101 smoke 48 + 48, cross-stack 830 pass unbalanced and 759 pass with 64 known-difference balanced; IEC 102 smoke 115, cross-stack 73; IEC 103 smoke 52, cross-stack 120 pass with 40 known-difference; IEC 104 smoke 59, cross-stack 1534 pass with 9 known-difference; 0 fail. Without the own image nothing changed: IEC 103 references 36 pass, 0 fail, 45 known-difference, 39 unsupported; gisce smoke 61 pass.
+
+---
+
 ## v0.4.0
 
 **Date:** 2026-11-12

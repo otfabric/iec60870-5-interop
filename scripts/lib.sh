@@ -55,6 +55,13 @@ log()  { echo "[$(basename "$0" .sh)] $*" >&2; }
 ok()   { PASS=$((PASS + 1)); result pass; [[ -n "${VERBOSE:-}" ]] && log "ok: $*"; return 0; }
 fail() { FAIL=$((FAIL + 1)); result fail "$*"; log "FAIL: $*"; return 0; }
 
+# GATE=<adapter>: the cross-stack self-tests run only the pairings that have
+# this adapter as client or server (an image outside the release set, such as
+# OT Fabric's own one, against the references), not the references among
+# themselves. Unset: every pairing.
+GATE="${GATE:-}"
+gated() { [[ -z "${GATE}" || "$1" == "${GATE}" || "$2" == "${GATE}" ]]; }
+
 # image_of <adapter>: ADAPTER_IMAGE_<standard>_<adapter> names an image outside the release
 # set, which this repository's scripts know nothing about.
 image_of() {

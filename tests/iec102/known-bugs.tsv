@@ -5,4 +5,6 @@
 # commit). Every entry needs wire evidence from a run (docs/COMPATIBILITY.md).
 # None yet: gisce/iec870ree kept the contract in every run against the
 # scripted meter (tests/iec102/meter.py), which is not an implementation of
-# IEC 102, so this file says nothing about how gisce meets real meters.
+# IEC 102, and in the cross-stack run (scripts/interop.sh iec102) against the
+# otfabric station, which is not independent of this repository's owner
+# either, so this file says nothing about how gisce meets real meters.

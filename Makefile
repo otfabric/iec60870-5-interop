@@ -44,8 +44,8 @@ IEC102_ADAPTERS ?= gisce
 LINK_MODES ?= unbalanced balanced
 
 IMAGES := $(addprefix iec101-,$(IEC101_ADAPTERS)) $(addprefix iec102-,$(IEC102_ADAPTERS)) $(addprefix iec103-,$(IEC103_ADAPTERS)) $(addprefix iec104-,$(IEC104_ADAPTERS))
-# Built and tested, not published: the licence of riclolsen/go-iecp5 is not
-# settled (versions.yaml, iec103-goiecp5).
+# Images that are built and tested but not published (none: iec103-goiecp5 is
+# published since v0.2.1, docs/REFERENCE_STACKS.md).
 UNPUBLISHED ?=
 PUBLISHED := $(filter-out $(UNPUBLISHED),$(IMAGES))
 
