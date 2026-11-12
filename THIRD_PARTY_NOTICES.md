@@ -21,6 +21,7 @@ next to the licence texts.
 | `adapters/iec103/open103/` (compiles Open103's headers with its shim) | GPL-3.0-or-later |
 | `adapters/iec103/goiecp5/` (links riclolsen/go-iecp5) | GPL-3.0-or-later |
 | `adapters/iec102/gisce/` (imports gisce/iec870ree, AGPL-3.0) | GPL-3.0-or-later |
+| `own/go-iec60870-5/` (links otfabric/go-iec60870-5, MIT; ADR-0012) | MIT |
 | The published reference images | GPL-3.0 (they contain the libraries below); `iec102-gisce` GPL-3.0-or-later and AGPL-3.0; `iec101-digitalpetri` EPL-2.0 |
 
 The lib60870 and openmuc adapter programs are derivative works of GPL-3.0
@@ -237,6 +238,15 @@ client and serves nobody). Licence texts in the image:
 
 The scripted meter of the IEC 102 smoke test (`tests/iec102/meter.py`, MIT)
 runs in the same pinned Python image; it is not part of any published image.
+
+## Images `iec60870-5-interop-<standard>-otfabric`
+
+OT Fabric's own stack, otfabric/go-iec60870-5 (MIT, Go, standard library
+only), behind the contract: `own/go-iec60870-5/`, MIT. Built with the Go
+toolchain (BSD-3-Clause); every linked module's licence is in the image under
+`/licenses/<module>/`, the list in `/licenses/BUNDLED-MODULES.txt`. Not a
+reference image and not in a release of this repository
+(own/go-iec60870-5/README.md).
 
 ## Corresponding source
 

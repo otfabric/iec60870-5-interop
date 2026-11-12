@@ -30,6 +30,7 @@ got_gi='[.asdus[] | select((.typeId == 1 or .typeId == 2) and .cot == 9) | .obje
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     name=$(shared_server "${server}")
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         doc=$(run_client "${client}" interrogate --scn 5 --host "${name}")
         keep "iec103-values-interrogation-${client}->${server}" "${doc}"
         value_check values.interrogation "${client}" "${server}" "interrogate --scn 5" \
@@ -42,6 +43,7 @@ want_id=$(jq -cS '[.station.identification | {fun, inf: 3, col, ascii, software}
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     name=$(shared_server "${server}")
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         if ! supported "${client}" "${server}" "server:identification,client:identification"; then
             at_pair values.identification "${client}" "${server}"; skip "${client}->${server}: identification"; continue
         fi
@@ -59,6 +61,7 @@ done
 # is not significant), and a later interrogation reports the new state.
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         if ! supported "${client}" "${server}" "server:generalCommand,client:generalCommand"; then
             at_pair values.command-interrogation "${client}" "${server}"; skip "${client}->${server}: command"; continue
         fi
@@ -84,6 +87,7 @@ want_meas=$(jq -cS '[.measurands[]? | {type, fun, inf, values: [.values[] | {val
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     name=$(shared_server "${server}")
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         if ! supported "${client}" "${server}" "server:measurands,client:measurands"; then
             at_pair values.measurands "${client}" "${server}"; skip "${client}->${server}: measurands"; continue
         fi
@@ -103,6 +107,7 @@ want_gen=$(jq -cS '[.generic[]? | {gin: "\(.gin.group).\(.gin.entry)", kod: 1, t
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     name=$(shared_server "${server}")
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         if ! supported "${client}" "${server}" "server:genericServices,client:genericServices"; then
             at_pair values.generic-read "${client}" "${server}"; skip "${client}->${server}: generic read"; continue
         fi
@@ -123,6 +128,7 @@ done
 # acknowledged with cause 40 and a later read returns the new value.
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         if ! supported "${client}" "${server}" "server:genericServices,client:genericServices"; then
             at_pair values.generic-write "${client}" "${server}"; skip "${client}->${server}: generic write"; continue
         fi
@@ -143,6 +149,7 @@ want_list=$(jq -cS '[.disturbances[]? | {fan, sof: {tp: (.sof.tp // false), tm: 
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     name=$(shared_server "${server}")
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         if ! supported "${client}" "${server}" "server:disturbanceList,client:disturbanceList"; then
             at_pair values.disturbance-list "${client}" "${server}"; skip "${client}->${server}: disturbance list"; continue
         fi
@@ -162,6 +169,7 @@ want_dist=$(jq -cS '.disturbances[0] | {fan, noc: (.channels | length), noe: (.c
 want_vals=$(jq -cS '[.disturbances[0].channels[] | {acc, values}]' "${FIXTURE}")
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         if ! supported "${client}" "${server}" "server:disturbanceDataServer,client:disturbanceData"; then
             at_pair values.disturbance-transfer "${client}" "${server}"; skip "${client}->${server}: disturbance transfer"; continue
         fi
@@ -182,6 +190,7 @@ done
 for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
     name=$(shared_server "${server}")
     for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+        gated "${client}" "${server}" || continue
         pair="${client}->${server}"
         at_pair session.idle-hold "${client}" "${server}"
         doc=$(run_client "${client}" connect --hold-ms 3000 --host "${name}")

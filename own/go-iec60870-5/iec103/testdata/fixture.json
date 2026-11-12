@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "1.0",
+  "name": "baseline",
+  "description": "One IEC 103 protection device (overcurrent protection, function type 160): its identification, status indications of the compatible range answered by a general interrogation, measurands I and II sent as cyclic class 2 data, and general commands of table 17 that set the indication with the same function type and information number (160/18 is an indication but no command of the device). Generic data of group 1 (settings: read with ASDU 21, written with ASDU 10) and one recorded disturbance with tags and two channels (clause 7.4.7).",
+  "station": {
+    "commonAddress": 1,
+    "identification": { "fun": 160, "col": 2, "ascii": "OTFAB103", "software": "01020304" }
+  },
+  "indications": [
+    { "fun": 160, "inf": 16, "dpi": 2 },
+    { "fun": 160, "inf": 17, "dpi": 1 },
+    { "fun": 160, "inf": 18, "dpi": 2 },
+    { "fun": 160, "inf": 19, "dpi": 1 },
+    { "fun": 160, "inf": 23, "dpi": 2 },
+    { "fun": 160, "inf": 24, "dpi": 1 },
+    { "fun": 160, "inf": 27, "dpi": 1 },
+    { "fun": 160, "inf": 36, "dpi": 1 },
+    { "fun": 160, "inf": 68, "dpi": 1, "gi": false }
+  ],
+  "measurands": [
+    { "fun": 160, "inf": 144, "type": 3, "values": [ { "value": 2048 } ] },
+    { "fun": 160, "inf": 145, "type": 3, "values": [ { "value": 1024 }, { "value": -512, "ov": true } ] },
+    { "fun": 160, "inf": 148, "type": 9, "values": [
+      { "value": 100 }, { "value": 200 }, { "value": 300 },
+      { "value": 3000 }, { "value": 3001 }, { "value": 2999 },
+      { "value": -4096 }, { "value": 4095, "ov": true }, { "value": 0, "er": true }
+    ] }
+  ],
+  "commands": [
+    { "fun": 160, "inf": 16 },
+    { "fun": 160, "inf": 17 },
+    { "fun": 160, "inf": 19 }
+  ],
+  "generic": [
+    {
+      "gin": { "group": 1, "entry": 1 },
+      "description": "RATED I",
+      "type": 3,
+      "size": 2,
+      "value": 1000
+    },
+    {
+      "gin": { "group": 1, "entry": 2 },
+      "description": "PICKUP I>",
+      "type": 7,
+      "size": 4,
+      "value": 1.5,
+      "writable": true
+    },
+    {
+      "gin": { "group": 1, "entry": 3 },
+      "description": "DELAY t>",
+      "type": 3,
+      "size": 2,
+      "value": 300,
+      "writable": true
+    },
+    {
+      "gin": { "group": 1, "entry": 4 },
+      "description": "FEEDER",
+      "type": 1,
+      "size": 8,
+      "value": "FEEDER 1"
+    },
+    {
+      "gin": { "group": 1, "entry": 5 },
+      "description": "OFFSET",
+      "type": 4,
+      "size": 2,
+      "value": -20
+    }
+  ],
+  "disturbances": [
+    {
+      "fan": 7,
+      "sof": { "tp": true },
+      "time": "2026-10-09T15:30:00.012Z",
+      "nof": 3,
+      "interval": 1000,
+      "start": "15:30:00.000",
+      "tags": [
+        { "pos": 0, "fun": 160, "inf": 84, "dpi": 1 },
+        { "pos": 0, "fun": 160, "inf": 90, "dpi": 1 },
+        { "pos": 12, "fun": 160, "inf": 84, "dpi": 2 },
+        { "pos": 20, "fun": 160, "inf": 90, "dpi": 2 }
+      ],
+      "channels": [
+        {
+          "acc": 1,
+          "rpv": 600,
+          "rsv": 1,
+          "rfa": 1,
+          "values": [0, 1854, 3527, 4854, 5706, 6000, 5706, 4854, 3527, 1854, 0, -1854, -12343, -16989, -19972, -21000, -19972, -16989, -12343, -6489, 0, 6489, 12343, 16989, 19972, 21000, 19972, 16989, 12343, 6489, 0, -6489, -12343, -16989, -19972, -21000, -19972, -16989, -12343, -6489]
+        },
+        {
+          "acc": 2,
+          "rpv": 600,
+          "rsv": 1,
+          "rfa": 1,
+          "values": [-5196, -5869, -5967, -5481, -4459, -3000, -1247, 627, 2440, 4015, 5196, 5869, 20885, 19184, 15606, 10500, 4366, -2195, -8541, -14052, -18187, -20541, -20885, -19184, -15606, -10500, -4366, 2195, 8541, 14052, 18187, 20541, 20885, 19184, 15606, 10500, 4366, -2195, -8541, -14052]
+        }
+      ]
+    }
+  ]
+}

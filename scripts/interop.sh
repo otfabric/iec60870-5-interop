@@ -15,6 +15,9 @@
 # IEC 103 (scripts/interop-iec103.sh) has its own checks on values: the
 # interrogation, the identification, a command and the measurands; and its
 # images may be clients only, so pairings are every client with every server.
+# IEC 102 (scripts/interop-iec102.sh) likewise: the integrated totals, the
+# clock, the product identification and the tariff records of the fixture,
+# set-time and the station's events.
 # And tests/feature-cases.tsv and tests/secure-cases.tsv for the pairings that
 # have what those cases need.
 #
@@ -45,6 +48,7 @@ ADAPTERS=("$@")
 FIXTURE="${ROOT}/fixtures/${STANDARD}/baseline/fixture.json"
 CASES="${ROOT}/tests/${STANDARD}/cases.tsv"
 KNOWN_BUGS="${ROOT}/tests/${STANDARD}/known-bugs.tsv"
+KNOWN_BUGS_CONSUMER="${ROOT}/tests/${STANDARD}/known-bugs-consumer.tsv"
 # Scenario ids of results.json: <standard>[.<link mode>].<id of the case>.
 ID_PREFIX="${STANDARD}${LINK_MODE:+.${LINK_MODE}}."
 # The names of results.json: <standard>-<adapter>, as in versions.yaml.
@@ -60,6 +64,7 @@ network_up
 # ${WORK}/active: "<adapter>\t<operation regex>\t<description>\t<waiver id>\t<evidence>" per line.
 : > "${WORK}/active"
 : > "${WORK}/reproduced"
+: > "${WORK}/consumer"
 for adapter in "${ADAPTERS[@]}"; do
     docker run --rm "$(image_of "${adapter}")" print-capabilities > "${WORK}/caps-${adapter}.json" 2>/dev/null
     version=$(jq -r '.upstream.version' "${WORK}/caps-${adapter}.json")
@@ -75,6 +80,18 @@ for adapter in "${ADAPTERS[@]}"; do
             log "known bug in ${adapter} ${version}: ${bug_text}"
         fi
     done < "${KNOWN_BUGS}"
+    # tests/<standard>/known-bugs-consumer.tsv: bugs that only a station or a
+    # control system other than the references shows (such as OT Fabric's own
+    # image, own/). They waive what they explain like known-bugs.tsv, but an
+    # entry that does not reproduce is not stale: no reference shows it.
+    [[ -f "${KNOWN_BUGS_CONSUMER}" ]] || continue
+    while IFS=$'\t' read -r bug_adapter bug_version bug_regex bug_text bug_id bug_url; do
+        [[ -z "${bug_adapter}" || "${bug_adapter}" == \#* ]] && continue
+        if [[ "${bug_adapter%@*}" == "${adapter}" && "${bug_version}" == "${version}" ]]; then
+            printf '%s\t%s\t%s\t%s\t%s\n' "${bug_adapter}" "${bug_regex}" "${bug_text}" "${bug_id}" "${bug_url}" >> "${WORK}/active"
+            echo "${bug_id}" >> "${WORK}/consumer"
+        fi
+    done < "${KNOWN_BUGS_CONSUMER}"
 done
 
 # has <adapter> <feature>: the adapter declares the feature.
@@ -185,8 +202,8 @@ hit_known_bug() {
     return 0
 }
 
-# The adapters with each role. Every IEC 101 and 104 image has both; an IEC 103
-# image may be a client only.
+# The adapters with each role. Every IEC 101 and 104 image has both; an IEC 102
+# or IEC 103 image may be a client only.
 SERVERS=() CLIENTS=()
 for adapter in "${ADAPTERS[@]}"; do
     has_role "${adapter}" server && SERVERS+=("${adapter}")
@@ -218,6 +235,7 @@ while IFS=$'\t' read -r case_id state want_exit want_summary needs operation; do
     case_link=$(link_flags ${operation})
     for server in ${SERVERS[@]+"${SERVERS[@]}"}; do
         for client in ${CLIENTS[@]+"${CLIENTS[@]}"}; do
+            gated "${client}" "${server}" || continue
             pair="${client}->${server}"
             at_pair "${case_id}" "${client}" "${server}"
             if ! supported "${client}" "${server}" "${needs}"; then
@@ -281,6 +299,9 @@ done < "${CASES}"
 if [[ "${STANDARD}" == iec103 ]]; then
     # shellcheck source=scripts/interop-iec103.sh
     source "${SCRIPT_DIR}/interop-iec103.sh"
+elif [[ "${STANDARD}" == iec102 ]]; then
+    # shellcheck source=scripts/interop-iec102.sh
+    source "${SCRIPT_DIR}/interop-iec102.sh"
 else
 # ---- values: an interrogation returns the fixture ----
 want_points=$(jq -cS '[.points[] | select(.type != "M_IT_NA_1")
@@ -291,6 +312,7 @@ got_points='[.asdus[] | select(.cot == $cot) | .type as $t | .objects[] | {ioa, 
 for server in "${ADAPTERS[@]}"; do
     name=$(shared_server "${server}")
     for client in "${ADAPTERS[@]}"; do
+        gated "${client}" "${server}" || continue
         pair="${client}->${server}"
         at_pair values.interrogation "${client}" "${server}"
         got=$(run_client "${client}" interrogate --host "${name}" | jq -cS --argjson cot 20 "${got_points}")
@@ -309,6 +331,7 @@ done
 value_of='[.asdus[] | .objects[] | select(.ioa == $ioa) | .value] | first'
 for server in "${ADAPTERS[@]}"; do
     for client in "${ADAPTERS[@]}"; do
+        gated "${client}" "${server}" || continue
         pair="${client}->${server}"
         at_pair values.set-point-report "${client}" "${server}"
         name=$(start_server "${server}"); wait_ready "${name}" || exit 1
@@ -340,6 +363,7 @@ if serial_standard; then
     for server in "${ADAPTERS[@]}"; do
         name=$(shared_server "${server}")
         for client in "${ADAPTERS[@]}"; do
+            gated "${client}" "${server}" || continue
             pair="${client}->${server}"
             at_pair session.idle-hold "${client}" "${server}"
             doc=$(run_client "${client}" connect --hold-ms 3000 --host "${name}")
@@ -367,6 +391,7 @@ if ! serial_standard; then
         name=$(SERVER_TAG=tight start_server "${server}" --k 1 --w 1 --t1 2 --t2 1 --t3 2)
         wait_ready "${name}" || exit 1
         for client in "${ADAPTERS[@]}"; do
+            gated "${client}" "${server}" || continue
             pair="${client}->${server}"
             at_pair session.window-k1-w1 "${client}" "${server}"
             got=$(run_client "${client}" interrogate --k 1 --w 1 --host "${name}" | jq -cS --argjson cot 20 "${got_points}")
@@ -383,6 +408,7 @@ if ! serial_standard; then
 
         name=$(shared_server "${server}")
         for client in "${ADAPTERS[@]}"; do
+            gated "${client}" "${server}" || continue
             pair="${client}->${server}"
             at_pair session.concurrent "${client}" "${server}"
             tmp=$(mktemp -d)
@@ -410,6 +436,7 @@ if ! serial_standard; then
         want_hash=$(python3 -c 'import hashlib,sys; ioa,size=int(sys.argv[1]),int(sys.argv[2]); print(hashlib.sha256(bytes((i+ioa)%251 for i in range(size))).hexdigest())' "${file_ioa}" "${file_size}")
         for server in "${ADAPTERS[@]}"; do
             for client in "${ADAPTERS[@]}"; do
+                gated "${client}" "${server}" || continue
                 pair="${client}->${server}"
                 at_pair "files.get-${file_ioa}" "${client}" "${server}"
                 supported "${client}" "${server}" "server:fileServer,client:fileClient" || { skip "${pair}: file ${file_ioa}"; continue; }
@@ -454,6 +481,7 @@ if ! serial_standard; then
         reference="" reference_pair=""
         for server in "${ADAPTERS[@]}"; do
             for client in "${ADAPTERS[@]}"; do
+                gated "${client}" "${server}" || continue
                 pair="${client}->${server}"
                 at_pair "${case_id}" "${client}" "${server}"
                 if ! supported "${client}" "${server}" "${needs}"; then
@@ -499,6 +527,7 @@ if ! serial_standard; then
     for server in "${ADAPTERS[@]}"; do
         has "${server}" fileUploadServer || continue
         for client in "${ADAPTERS[@]}"; do
+            gated "${client}" "${server}" || continue
             pair="${client}->${server}"
             at_pair values.upload-event "${client}" "${server}"
             supported "${client}" "${server}" "server:fileUploadServer,client:fileUploadClient" || { skip "${pair}: upload"; continue; }
@@ -541,6 +570,7 @@ if ! serial_standard; then
     for server in "${ADAPTERS[@]}"; do
         has "${server}" redundancyServer || continue
         for client in "${ADAPTERS[@]}"; do
+            gated "${client}" "${server}" || continue
             pair="${client}->${server}"
             at_pair values.redundancy-event "${client}" "${server}"
             supported "${client}" "${server}" "server:redundancyServer,client:redundancyClient" || { skip "${pair}: redundancy"; continue; }
@@ -561,6 +591,7 @@ if ! serial_standard; then
         name=$(feature_server ro "${server}" "$(feature_flags "@ext @tls-station --tls-trust /secrets/ca.pem")") \
             || { fail "${server}: the TLS server did not start"; continue; }
         for client in "${ADAPTERS[@]}"; do
+            gated "${client}" "${server}" || continue
             pair="${client}->${server}"
             at_pair feature.tls.client-without-tls "${client}" "${server}"
             has_role "${client}" client || { skip "${pair}: client without TLS"; continue; }
@@ -580,6 +611,7 @@ if ! serial_standard; then
         has "${server}" pointQualityOnBitstring || continue
         name=$(feature_server ro "${server}" "$(feature_flags @ext)") || { fail "${server}: the extended server did not start"; continue; }
         for client in "${ADAPTERS[@]}"; do
+            gated "${client}" "${server}" || continue
             pair="${client}->${server}"
             for group in 0 1 2 3 16; do
                 at_pair "values.group-${group}" "${client}" "${server}"
@@ -613,6 +645,7 @@ if ! serial_standard; then
     secure_pairs=0
     for server in "${ADAPTERS[@]}"; do
         for client in "${ADAPTERS[@]}"; do
+            gated "${client}" "${server}" || continue
             supported "${client}" "${server}" "server:secureAuthentication,client:secureAuthentication" \
                 && secure_pairs=$((secure_pairs + 1))
         done
@@ -629,6 +662,7 @@ if ! serial_standard; then
             reference="" reference_pair=""
             for server in "${ADAPTERS[@]}"; do
                 for client in "${ADAPTERS[@]}"; do
+                    gated "${client}" "${server}" || continue
                     pair="${client}->${server}"
                     at_pair "${case_id}" "${client}" "${server}"
                     supported "${client}" "${server}" "server:secureAuthentication,client:secureAuthentication" || { skip "${pair}: ${case_id}"; continue; }
@@ -672,6 +706,10 @@ RESULT_ID=""
 while IFS=$'\t' read -r bug_adapter _ bug_text bug_id bug_url; do
     if grep -qxF "${bug_text}" "${WORK}/reproduced"; then
         waiver "${bug_id}" "${bug_adapter}" "${bug_url}" true
+    elif grep -qxF "${bug_id}" "${WORK}/consumer"; then
+        :  # a consumer entry no reference shows: no waiver, not stale
+    elif [[ -n "${GATE}" && "${bug_adapter%@*}" != "${GATE}" ]]; then
+        :  # the pairings that show it may be outside the gate: not stale
     else
         waiver "${bug_id}" "${bug_adapter}" "${bug_url}" false
         at "${ID_PREFIX}waiver.stale"

@@ -55,6 +55,25 @@ jobs:
             echo "::error::consumer-specific reference found"; exit 1
           fi
 
+  # The own-stack adapters (ADR-0012, own/go-iec60870-5/README.md): only that
+  # they compile and pass their unit tests on the go.mod starting point. The
+  # images are built, tested and published by hand (own-go-iec60870-5.yml).
+  own:
+    name: Own stack module (vet, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: own/go-iec60870-5/go.mod
+          cache-dependency-path: own/go-iec60870-5/go.sum
+      - name: gofmt, go vet, go test
+        working-directory: own/go-iec60870-5
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go test -race -count=1 ./...
+
   # Built and self-tested natively on both architectures: no emulation.
   selftest:
     name: Build, smoke, cross-stack (${{ matrix.arch }})
