@@ -68,6 +68,7 @@ versions and `manifest.json` does not list it: see
 | What each image can do | [docs/CAPABILITIES.md](docs/CAPABILITIES.md) |
 | Fixtures and station behaviour | [docs/FIXTURES.md](docs/FIXTURES.md) |
 | Self-test results, exact counts | [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) |
+| How the harness is tested, locally and in CI | [TESTING.md](TESTING.md) |
 | Candidate reference stacks per standard | [docs/REFERENCE_STACKS.md](docs/REFERENCE_STACKS.md) |
 | What comes next | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | Pins | [versions.yaml](versions.yaml) |
