@@ -1,0 +1,77 @@
+name: Upstream
+run-name: "Upstream check (${{ github.event_name }})"
+
+# Daily check of every pin against the latest upstream: the implementations of
+# versions.yaml (scripts/latest-upstream.py: a release pin against the newest
+# version tag on GitHub, a commit pin against the head of the default branch,
+# OpenMUC j60870 against Maven Central) and the digest of every base image. The
+# table goes to the Job Summary and to the issue "Upstream releases: pins behind
+# the latest", which is opened or updated (with a comment when a new version
+# shows up) and closed once every pin is current. Pins are never changed here: a
+# bump is a reviewed change that CI builds and smoke-tests. Shared steps:
+# https://github.com/otfabric/.github/tree/main/actions
+on:
+  schedule:
+    - cron: "47 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream
+  cancel-in-progress: false
+
+env:
+  BASE_REGISTRY: mirror.gcr.io/library
+
+jobs:
+  images:
+    name: Base images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: otfabric/.github/actions/upstream-images@v3.6.0
+
+  pins:
+    name: Implementations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/latest-upstream.py --rows "$RUNNER_TEMP/rows"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: upstream-row-implementations
+          path: ${{ runner.temp }}/rows
+
+  report:
+    name: Report
+    runs-on: ubuntu-latest
+    needs: [images, pins]
+    if: always()
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: otfabric/.github/actions/upstream-report@v3.6.0
+        with:
+          needs: ${{ toJSON(needs) }}
+          notes: |
+            ### To update
+
+            - **Implementation:** move the pin in the adapter's Dockerfile (`ARG *_VERSION`,
+              `ARG *_SHA`) and its lock file (`go.mod`/`go.sum`, `pom.xml`, `requirements.txt`,
+              `packages.lock.json`), then `version` and `revision` in `versions.yaml`
+              (`scripts/check-versions.sh` checks that they agree). A commit pin is a commit of
+              a repository without a release (digitalpetri, Open103) or after its last tag
+              (ARIEC103). Run `make ci` locally; CI builds and smoke-tests the bump.
+            - **Base image:** replace the digest in `versions.yaml` and in every Dockerfile that
+              pins it.
+            - Record the change in `docs/COMPATIBILITY.md` and `RELEASE.md`.
