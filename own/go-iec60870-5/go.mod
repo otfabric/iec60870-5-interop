@@ -2,4 +2,4 @@ module github.com/otfabric/iec60870-5-interop/own/go-iec60870-5
 
 go 1.26.0
 
-require github.com/otfabric/go-iec60870-5 v0.5.2
+require github.com/otfabric/go-iec60870-5 v0.6.0
