@@ -410,7 +410,7 @@ confirms it still reproduces with the same pin.
 
 ## OT Fabric's own images
 
-`iec<std>-otfabric` (own/go-iec60870-5, go-iec60870-5 v0.5.2 at `40002fc`,
+`iec<std>-otfabric` (own/go-iec60870-5, go-iec60870-5 v0.6.0 at `40002fc`,
 not references: `independent: false`) against the references of
 iec60870-5-interop v0.4.0, `make -f own/go-iec60870-5/Makefile images smoke-all
 interop-all VERSION=v0.4.0`, locally on linux/arm64 (Docker for macOS),
