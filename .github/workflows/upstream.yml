@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: otfabric/.github/actions/upstream-images@v3.6.0
+      - uses: otfabric/.github/actions/upstream-images@v3.8.0
 
   pins:
     name: Implementations
@@ -60,7 +60,7 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: otfabric/.github/actions/upstream-report@v3.6.0
+      - uses: otfabric/.github/actions/upstream-report@v3.8.0
         with:
           needs: ${{ toJSON(needs) }}
           notes: |
