@@ -58,7 +58,7 @@ the reference stacks are summarised in [docs/COMPATIBILITY.md](docs/COMPATIBILIT
 
 ## CI
 
-- `ci.yml` (push, pull request, daily, manual): fixtures, versions, script tests and
+- `ci.yml` (every pull request that is not documentation only through `pr.yml`, daily, manual): fixtures, versions, script tests and
   shellcheck; vet and race tests of the own stack module (`own/go-iec60870-5`); then on an
   amd64 and an arm64 runner every image built natively, its architecture checked,
   `make capabilities` and `make documents`, with the documents uploaded as an artifact.
@@ -70,3 +70,15 @@ the reference stacks are summarised in [docs/COMPATIBILITY.md](docs/COMPATIBILIT
   never changes a pin.
 - `own-go-iec60870-5.yml` (manual) builds and tests OT Fabric's own images.
 - `policy.yml` checks the repository against the otfabric/engineering policy.
+
+## When CI runs
+
+| Event | Workflow | What runs |
+|---|---|---|
+| Pull request | `pr.yml` | `policy.yml` (otfabric-policy) always; `ci.yml` unless every changed file is documentation; then `OT Fabric Required Checks` |
+| Push to a branch | none | nothing; dispatch `ci.yml` to test a branch without a pull request |
+| Push to `main` | `policy.yml` | the light checks; the merged commit was tested as the pull request's merge commit |
+| Schedule | `ci.yml`, `upstream.yml` | the scheduled runs, on `main` |
+| Release | `release.yml` | the release workflow tests the release commit again |
+
+Documentation means an added or modified `*.md` file outside `.github/`, `testdata/` and `vendor/`, other than `AGENTS.md` and `CLAUDE.md`. A deleted or renamed document, or any other file, runs everything. `OT Fabric Required Checks` fails unless every job that applies succeeded; its summary lists them.
