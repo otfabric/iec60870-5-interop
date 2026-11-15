@@ -9,12 +9,12 @@ containers, behind one command-line contract, with deterministic fixtures.
 A library or tool that implements IEC 101, 102, 103 or 104 tests against these
 images; nothing in this repository knows about any such consumer.
 
-**Status: v0.5.0 (IEC 101, 102, 103, 104; contract 2.3; OT Fabric's own images for all four standards, the first IEC 102 station).**
+**Status: v0.6.0 (IEC 101, 102, 103, 104; contract 2.3; OT Fabric's own images for all four standards, the first IEC 102 station).**
 
 | Standard | Images (`ghcr.io/otfabric/iec60870-5-interop-<standard>-<stack>`) | Status |
 |----------|-------------------------------------------------------------------|--------|
 | IEC 60870-5-101 | `iec101-lib60870` (lib60870-C v2.4.1), `iec101-cbsigma` (cB-Sigma/iec60870 v0.3.0), `iec101-digitalpetri` (digitalpetri/iec60870 33e52b3, EPL-2.0) | validated locally: smoke and the cross-stack run, unbalanced and balanced, default and four other sets of field sizes (contract 2.3) ([COMPATIBILITY](docs/COMPATIBILITY.md)) |
-| IEC 60870-5-104 | `iec104-lib60870`, `iec104-openmuc`, `iec104-wendy512`, `iec104-cbsigma`, `iec104-part5` (from iec104-interop 0.6.0) | experimental: built and self-tested here ([COMPATIBILITY](docs/COMPATIBILITY.md)), not yet released from this repository |
+| IEC 60870-5-104 | `iec104-lib60870`, `iec104-openmuc`, `iec104-wendy512`, `iec104-cbsigma`, `iec104-part5` (from iec104-interop 0.6.0) | released since v0.1.0; experimental in versions.yaml. Smoke of all five and the 5 × 5 cross-stack run passed locally (3071 pass, 0 fail; [COMPATIBILITY](docs/COMPATIBILITY.md#iec-60870-5-104)) |
 | IEC 60870-5-102 | `iec102-gisce` (gisce/iec870ree v0.14.1, REE profile, client) | experimental: smoke-tested against a scripted meter of this repository, which is not an implementation of IEC 102; there is no open controlled station ([COMPATIBILITY](docs/COMPATIBILITY.md#iec-60870-5-102)) |
 | IEC 60870-5-103 | `iec103-vitusdong` (vitusdong/iec103-dotnet v0.1.0, server and client), `iec103-ariec103` (masarray/ARIEC103, client), `iec103-open103` (XVincentX/Open103, client), `iec103-goiecp5` (riclolsen/go-iecp5 v0.4.7 cs103, client) | validated locally, unbalanced, every client against the one server; the server deviates from the standard in every checked reply (known bugs, [COMPATIBILITY](docs/COMPATIBILITY.md#iec-60870-5-103)) |
 

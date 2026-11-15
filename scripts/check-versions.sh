@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
-# Fails when versions.yaml disagrees with what the builds actually pin.
+# Fails when versions.yaml disagrees with what the builds actually pin: the
+# Dockerfiles, the adapters' go.mod, go.sum and pom.xml, the published images
+# of the Makefile, its tool images and the govulncheck job of ci.yml. A value
+# that is not found in the build files fails too.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 status=0
 
 need() {  # need <description> <value that must appear in versions.yaml>
-    if grep -qF -- "$2" versions.yaml; then
+    if [[ -z "$2" ]]; then
+        echo "FAIL $1: no value found in the build files"
+        status=1
+    elif grep -qF -- "$2" versions.yaml; then
         echo "ok   $1: $2"
     else
         echo "FAIL $1: $2 is not in versions.yaml"
@@ -64,7 +70,11 @@ fi
 
 # ---- IEC 101: the same upstream pins as the IEC 104 images ----
 for v in LIB60870_VERSION LIB60870_SHA DEBIAN_DIGEST MBEDTLS_VERSION MBEDTLS_SHA256; do
-    if [[ "$(arg adapters/iec101/lib60870/Dockerfile "$v")" != "$(arg adapters/iec104/lib60870/Dockerfile "$v")" ]]; then
+    a101="$(arg adapters/iec101/lib60870/Dockerfile "$v")" a104="$(arg adapters/iec104/lib60870/Dockerfile "$v")"
+    if [[ -z "${a101}" || -z "${a104}" ]]; then
+        echo "FAIL iec101 lib60870 ${v}: not found in both lib60870 Dockerfiles"
+        status=1
+    elif [[ "${a101}" != "${a104}" ]]; then
         echo "FAIL iec101 lib60870 ${v}: differs from the iec104 adapter"
         status=1
     else
@@ -120,4 +130,75 @@ for pair in vitusdong:VITUSDONG ariec103:ARIEC103 open103:OPEN103; do
     need "iec103 ${a} runtime"  "$(arg "adapters/iec103/${a}/Dockerfile" RUNTIME_DIGEST)"
     [[ -f "adapters/iec103/${a}/packages.lock.json" ]] || { echo "FAIL iec103 ${a}: no packages.lock.json"; status=1; }
 done
+
+# ---- every implementation: published, and the hash of its source ----
+# impl <name> <field> [engine]: a field of implementations.<name>, or of its engine.
+impl() {
+    awk -v n="$1" -v f="$2" -v e="${3:-}" '
+        /^[a-z_]+:/ { sect = $1 }
+        sect != "implementations:" { next }
+        /^  [a-z0-9-]+:$/ { cur = $1; sub(/:$/, "", cur); part = ""; next }
+        cur == n && /^    engine:$/ { part = "engine"; next }
+        cur == n && /^    [a-z]/ { part = "" }
+        cur == n && part == e && $1 == f ":" { v = $2; gsub(/"/, "", v); print v; exit }
+    ' versions.yaml
+}
+names=" $(awk '/^[a-z_]+:/ { sect = $1 } sect == "implementations:" && /^  [a-z0-9-]+:$/ { sub(/:$/, "", $1); printf "%s ", $1 }' versions.yaml)"
+images=" $(awk '/^[a-z_]+:/ { sect = $1 } sect == "images:" && /^  [a-z0-9-]+:/ { sub(/:$/, "", $1); printf "%s ", $1 }' versions.yaml)"
+# The images a release publishes: PUBLISHED of the Makefile, IMAGES without UNPUBLISHED.
+mk() { sed -nE "s/^$1[[:space:]]*\?=[[:space:]]*(.*)$/\1/p" Makefile | head -1; }
+published=" "
+for s in iec101 iec102 iec103 iec104; do
+    for a in $(mk "$(echo "${s}" | tr '[:lower:]' '[:upper:]')_ADAPTERS"); do published="${published}${s}-${a} "; done
+done
+for u in $(mk UNPUBLISHED); do published="${published/ ${u} / }"; done
+hex() {  # hex <description> <value>: a SHA-256 in hex
+    if [[ "$2" =~ ^[0-9a-f]{64}$ ]]; then echo "ok   $1: $2"; else echo "FAIL $1: '$2' is not a SHA-256"; status=1; fi
+}
+same_sum() {  # same_sum <description> <adapter directory> <module> <version> <module_sum of versions.yaml>
+    local got
+    got="$(awk -v m="$3" -v v="$4" '$1 == m && $2 == v { print $3; exit }' "$2/go.sum" 2>/dev/null)" || got=""
+    if [[ -n "${got}" && "${got}" == "$5" ]]; then echo "ok   $1 module sum: $5"
+    else echo "FAIL $1 module sum: $2/go.sum has '${got}' for $3 $4, versions.yaml '$5'"; status=1; fi
+}
+for n in ${names}; do
+    p="$(impl "${n}" published)"
+    case "${published}" in *" ${n} "*) want=true ;; *) want=false ;; esac
+    if [[ "${p}" != true && "${p}" != false ]]; then
+        echo "FAIL ${n} published: '${p}', not true or false"; status=1
+    elif [[ "${p}" != "${want}" ]]; then
+        echo "FAIL ${n} published: ${p}, but the Makefile (PUBLISHED) says ${want}"; status=1
+    elif [[ "${p}" == true && "${images}" != *" ${n} "* ]]; then
+        echo "FAIL ${n} published: not in images"; status=1
+    else
+        echo "ok   ${n} published: ${p}"
+    fi
+    dir="adapters/${n%%-*}/${n#*-}"
+    if [[ -n "$(impl "${n}" module)" ]]; then
+        same_sum "${n}" "${dir}" "$(impl "${n}" module)" "$(impl "${n}" version)" "$(impl "${n}" module_sum)"
+        if [[ -n "$(impl "${n}" module engine)" ]]; then
+            same_sum "${n} engine" "${dir}" "$(impl "${n}" module engine)" "$(impl "${n}" version engine)" "$(impl "${n}" module_sum engine)"
+        fi
+    elif [[ -n "$(impl "${n}" artifact)" ]]; then
+        hex "${n} artifact_sha256" "$(impl "${n}" artifact_sha256)"
+    else
+        hex "${n} source_sha256" "$(impl "${n}" source_sha256)"
+    fi
+done
+for i in ${published}; do
+    [[ "${names}" == *" ${i} "* ]] || { echo "FAIL ${i}: published by the Makefile, not in implementations"; status=1; }
+done
+hex "gson sha256" "$(sed -nE 's/^  gson_sha256: "([^"]*)".*$/\1/p' versions.yaml)"
+
+# ---- tooling: the tool images of the Makefile by digest, govulncheck of ci.yml ----
+tools='$(TOOLS_REGISTRY)/'
+while read -r var ref; do
+    case "${ref}" in
+        "${tools}"*@sha256:*) need "Makefile ${var}" "\"${ref#"${tools}"}\"" ;;
+        *) echo "FAIL Makefile ${var}: '${ref}' is not pinned by digest"; status=1 ;;
+    esac
+done < <(sed -nE 's/^([A-Z0-9_]+_IMAGE)[[:space:]]*\?=[[:space:]]*(.*)$/\1 \2/p' Makefile)
+ci=.github/workflows/ci.yml
+need "ci.yml govulncheck"    "$(sed -nE 's/^ *GOVULNCHECK_VERSION: "?(v[0-9][^" ]*)"?$/govulncheck@\1"/p' "${ci}" | head -1)"
+need "ci.yml govulncheck Go" "$(sed -nE 's/^ *GO_VERSION: "?([0-9][^" ]*)"?$/golang:\1-trixie@/p' "${ci}" | head -1)"
 exit "${status}"

@@ -50,7 +50,9 @@ contract ([docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)).
 wire evidence from a run; a case they explain is counted as a known bug, never as a pass.
 In the serial standards an entry may name a role (`<adapter>@client`,
 `<adapter>@server`). `tests/iec103/known-bugs-consumer.tsv` holds bugs seen only against
-a consumer's station; the harness applies them but never reports them stale.
+a consumer's station; the harness applies them, and reports one stale only in a run with
+OT Fabric's own image (`CONSUMER_RUN=1`, set by `own/go-iec60870-5/Makefile`), with which
+they reproduce.
 
 Every outcome goes to `results.json` (interop-result-v1, `schemas/`) in `REPORT_DIR`. A
 run with no pass, or with a known bug that no longer reproduces, fails. The results of
@@ -59,7 +61,8 @@ the reference stacks are summarised in [docs/COMPATIBILITY.md](docs/COMPATIBILIT
 ## CI
 
 - `ci.yml` (every pull request that is not documentation only through `pr.yml`, daily, manual): fixtures, versions, script tests and
-  shellcheck; vet and race tests of the own stack module (`own/go-iec60870-5`); then on an
+  shellcheck; vet and race tests of the own stack module (`own/go-iec60870-5`); govulncheck
+  of every Go module (the Go adapters and the own stack); then on an
   amd64 and an arm64 runner every image built natively, its architecture checked,
   `make capabilities` and `make documents`, with the documents uploaded as an artifact.
 - `release.yml` repeats the build and self-tests for a release and publishes what it

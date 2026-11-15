@@ -26,6 +26,16 @@ BASE_REGISTRY ?= docker.io/library
 # handlers, shellcheck, Python. CI sets TOOLS_REGISTRY=mirror.gcr.io.
 TOOLS_REGISTRY ?= docker.io
 
+# The tool images, pinned by version and digest (multi-arch indexes);
+# versions.yaml (tooling) mirrors them and scripts/check-versions.sh checks
+# both. The Python packages of the validators are pinned with their hashes in
+# scripts/requirements.txt.
+SHELLCHECK_IMAGE ?= $(TOOLS_REGISTRY)/koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
+PYTHON_IMAGE     ?= $(TOOLS_REGISTRY)/library/python:3.12.16-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+BINFMT_IMAGE     ?= $(TOOLS_REGISTRY)/tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+BUILDKIT_IMAGE   ?= $(TOOLS_REGISTRY)/moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
+PIP_INSTALL      := pip install -q --root-user-action=ignore --disable-pip-version-check --require-hashes --only-binary=:all: -r
+
 # Repeats a registry command that failed on a rate limit, a 5xx or a timeout.
 RETRY := scripts/retry.sh
 
@@ -79,8 +89,8 @@ validate: ## Validate every fixture against the schema and the cross-field rules
 		python3 scripts/validate-fixtures.py --require-schema; \
 	else \
 		echo "(jsonschema not installed locally: running the validator in a container)"; \
-		$(RETRY) docker run --rm -v "$(CURDIR):/work:ro" -w /work $(TOOLS_REGISTRY)/library/python:3.12-slim \
-			sh -c 'pip install -q --root-user-action=ignore jsonschema && python scripts/validate-fixtures.py --require-schema'; \
+		$(RETRY) docker run --rm -v "$(CURDIR):/work:ro" -w /work $(PYTHON_IMAGE) \
+			sh -c '$(PIP_INSTALL) scripts/requirements.txt && python scripts/validate-fixtures.py --require-schema'; \
 	fi
 
 documents: ## Run the self-tests keeping every document in reports/, and validate them against schemas/
@@ -90,8 +100,8 @@ documents: ## Run the self-tests keeping every document in reports/, and validat
 	@if python3 -c 'import jsonschema' 2>/dev/null; then \
 		python3 scripts/validate-documents.py reports; \
 	else \
-		$(RETRY) docker run --rm -v "$(CURDIR):/work:ro" -w /work $(TOOLS_REGISTRY)/library/python:3.12-slim \
-			sh -c 'pip install -q --root-user-action=ignore jsonschema && python scripts/validate-documents.py reports'; \
+		$(RETRY) docker run --rm -v "$(CURDIR):/work:ro" -w /work $(PYTHON_IMAGE) \
+			sh -c '$(PIP_INSTALL) scripts/requirements.txt && python scripts/validate-documents.py reports'; \
 	fi
 
 lint: ## Shellcheck the scripts (the installed shellcheck, or a container when there is none)
@@ -99,7 +109,7 @@ lint: ## Shellcheck the scripts (the installed shellcheck, or a container when t
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		shellcheck --severity=warning -x -P scripts scripts/*.sh; \
 	else \
-		$(RETRY) docker run --rm -v "$(CURDIR):/mnt:ro" $(TOOLS_REGISTRY)/koalaman/shellcheck:stable --severity=warning -x -P scripts scripts/*.sh; \
+		$(RETRY) docker run --rm -v "$(CURDIR):/mnt:ro" $(SHELLCHECK_IMAGE) --severity=warning -x -P scripts scripts/*.sh; \
 	fi
 
 # ── Local single-arch images (loaded into Docker; used by smoke and interop) ──
@@ -151,10 +161,10 @@ capabilities: ## Print the capability document of every image
 # ── Multi-arch build and publish ──────────────────────────────────────────────
 
 buildx-setup: ## Prepare multi-arch builds: QEMU handlers and a docker-container builder
-	@$(RETRY) docker run --privileged --rm $(TOOLS_REGISTRY)/tonistiigi/binfmt:latest --install arm64,amd64 >/dev/null
+	@$(RETRY) docker run --privileged --rm $(BINFMT_IMAGE) --install arm64,amd64 >/dev/null
 	@docker buildx rm $(BUILDER) >/dev/null 2>&1 || true
 	@$(RETRY) docker buildx create --name $(BUILDER) --driver docker-container \
-		--driver-opt image=$(TOOLS_REGISTRY)/moby/buildkit:buildx-stable-1 --bootstrap >/dev/null
+		--driver-opt image=$(BUILDKIT_IMAGE) --bootstrap >/dev/null
 
 builder_flag = $(shell docker buildx inspect $(BUILDER) >/dev/null 2>&1 && echo --builder $(BUILDER))
 

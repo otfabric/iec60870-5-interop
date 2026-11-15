@@ -28,7 +28,7 @@ Adapter sources link GPL-3.0 libraries: keep the `SPDX-License-Identifier: GPL-3
 
 ## Moving an upstream pin
 
-1. Change the pin in the Dockerfile (and `pom.xml`, or `go.mod` with `go mod tidy`) and in `versions.yaml`; `scripts/check-versions.sh` must pass.
+1. Change the pin in the Dockerfile (and `pom.xml`, or `go.mod` with `go mod tidy`) and in `versions.yaml`, with the hash of the new source: `module_sum` (the `h1:` of `go.sum`) for a Go module, `source_sha256` (the SHA-256 of the GitHub archive of the commit) for a git source, `artifact_sha256` of a Maven jar; `scripts/check-versions.sh` must pass.
 2. `make ci`.
 3. Record the new version, and anything it changed, in [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [RELEASE.md](RELEASE.md).
 
@@ -38,7 +38,7 @@ The daily Upstream workflow and the `candidate-*` targets of iec104-interop are 
 
 ## Registries and retries
 
-CI does not pull from Docker Hub: its anonymous rate limit and its token service fail too often on shared runners. The workflows set `BASE_REGISTRY=mirror.gcr.io/library` (base images, which the Dockerfiles pin by digest, so the mirror cannot change what is built) and `TOOLS_REGISTRY=mirror.gcr.io` (BuildKit, QEMU handlers, shellcheck). Locally both default to Docker Hub.
+CI does not pull from Docker Hub: its anonymous rate limit and its token service fail too often on shared runners. The workflows set `BASE_REGISTRY=mirror.gcr.io/library` (base images, which the Dockerfiles pin by digest, so the mirror cannot change what is built) and `TOOLS_REGISTRY=mirror.gcr.io` (BuildKit, QEMU handlers, shellcheck, Python, pinned by version and digest in the Makefile and `versions.yaml` `tooling`; `scripts/check-versions.sh` checks that they agree). Locally both default to Docker Hub.
 
 Every command that talks to a registry runs through `scripts/retry.sh`, which repeats it with a growing delay when the output shows a rate limit, a 5xx or a timeout, and returns any other failure at once. Use it for new registry or download steps instead of an action that cannot retry.
 
@@ -64,7 +64,7 @@ See [docs/FIXTURES.md](docs/FIXTURES.md#adding-a-fixture).
 2. Create `adapters/<standard>/<name>/` with a Dockerfile built from the repository root, following the existing ones: pinned build stage, minimal runtime stage, non-root user, `/fixtures`, `/licenses`, the readiness file, the health check, `ENTRYPOINT ["/usr/local/bin/iec60870-5-interop"]`, and `COPY fixtures/<standard> /fixtures`.
 3. Implement the contract. For a role the upstream does not support, the command exits 2 with a message and `roles` says `false`. What the upstream cannot do within a role is a feature declared `false`, and the cases that need it name it in their `needs` column: never fake a behaviour the library does not have.
 4. `scripts/smoke.sh <standard> <name>` must pass, then `scripts/interop.sh <standard> <the other adapters> <name>` (IEC 101: with `LINK_MODE=unbalanced` and `LINK_MODE=balanced`). Set its status in versions.yaml: `experimental` until both pass, `validated` once they pass and the counts are in docs/COMPATIBILITY.md.
-5. Add it to `IEC101_ADAPTERS` or `IEC104_ADAPTERS` in the Makefile, to the workflows, `versions.yaml`, `scripts/check-versions.sh`, the notices and the documentation tables.
+5. Add it to `IEC101_ADAPTERS` or `IEC104_ADAPTERS` in the Makefile, to the workflows, `versions.yaml` (with `published` and the hash of its source), `scripts/check-versions.sh`, the notices and the documentation tables.
 
 OT Fabric's own images are not adapters of this list: they live in `own/go-iec60870-5/` and are built and published by hand (own/go-iec60870-5/README.md).
 

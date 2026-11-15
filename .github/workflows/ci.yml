@@ -34,7 +34,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install jsonschema
+      - run: "pip install --require-hashes --only-binary=:all: -r scripts/requirements.txt"
       - name: Unit tests of the result scripts
         run: python3 -m unittest discover -q -s scripts -p 'test_*.py'
       - name: versions.yaml matches the build files
@@ -73,6 +73,31 @@ jobs:
           go vet ./...
           go test -race -count=1 ./...
 
+  # govulncheck of the Go modules whose binaries the images ship: the Go
+  # adapters and the own-stack adapters, with the Go of the golang base image
+  # and the govulncheck of versions.yaml (tooling); scripts/check-versions.sh
+  # checks both values.
+  vulncheck:
+    name: govulncheck (Go modules)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GO_VERSION: "1.27.2"
+      GOVULNCHECK_VERSION: v1.9.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: govulncheck
+        run: |
+          for m in adapters/*/*/go.mod own/*/go.mod; do
+            d="$(dirname "${m}")"
+            echo "govulncheck ${d}"
+            (cd "${d}" && GOTOOLCHAIN=local GOFLAGS=-mod=readonly go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...) || exit 1
+          done
+
   # Built and self-tested natively on both architectures: no emulation.
   selftest:
     name: Build, smoke, cross-stack (${{ matrix.arch }})
@@ -92,7 +117,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install jsonschema
+      - run: "pip install --require-hashes --only-binary=:all: -r scripts/requirements.txt"
 
       - name: Build images
         run: make images

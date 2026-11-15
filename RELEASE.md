@@ -18,6 +18,27 @@ section per version, newest first, each ending with a `---` line.
 
 ---
 
+## v0.6.0
+
+**Date:** 2026-11-15
+**Previous release:** v0.5.0
+
+### Changed
+
+- versions.yaml: every implementation records `published` (true for all thirteen) and the hash of its source: `module_sum` (the `go.sum` hash) for the Go modules, wendy512's engine included; `source_sha256`, the SHA-256 of the GitHub archive of the pinned commit, for lib60870-C, digitalpetri, gisce, vitusdong, ARIEC103 and Open103 (the build still fetches the commit with git and checks it); `artifact_sha256` of the j60870 1.8.0 jar and `gson_sha256` of the Gson 2.14.0 jar from Maven Central (recorded; the build does not check them yet). The `iec104-openmuc` entry says why it has no revision.
+- `scripts/check-versions.sh` fails when a value it looks for is not found in the build files (it passed on an empty one), when the IEC 101 and IEC 104 lib60870 pins are missing on either side, when `published` disagrees with the Makefile's published images or `images`, when a `module_sum` disagrees with `go.sum`, when an implementation has no source hash, and when a tool image or the govulncheck job of `ci.yml` disagrees with `versions.yaml`. Eleven cases in `scripts/test_check_versions.py`.
+- The tooling is pinned by version and digest: shellcheck v0.11.0, Python 3.12.16-slim, binfmt qemu-v10.2.3 and BuildKit v0.34.2 in the Makefile, recorded in `versions.yaml` `tooling`. jsonschema is installed as `jsonschema==4.26.0` with its dependencies from `scripts/requirements.txt` (`--require-hashes`), in the workflows and in the Python container of `make validate` and `make documents`, where it was unpinned.
+- CI job **govulncheck (Go modules)**: govulncheck v1.9.0, with Go 1.27.2 (the golang base image), on the five Go adapters and `own/go-iec60870-5`.
+- `CONSUMER_RUN=1` (`scripts/lib.sh`, set by `own/go-iec60870-5/Makefile`): in a run with OT Fabric's own image, an entry of `tests/<standard>/known-bugs-consumer.tsv` that does not reproduce is stale, like an entry of `known-bugs.tsv`; without it the entries are never stale, as before. The judgement of known bugs is `judge_known_bugs` in `scripts/lib.sh`; four cases in `scripts/test_write_results.py`.
+
+### Docs
+
+- README: the IEC 104 images are released since v0.1.0 (smoke and the 5 × 5 cross-stack run passed); docs/COMPATIBILITY.md likewise. The stale openmuc note in versions.yaml is gone. SECURITY.md lists every bundled implementation and says how each kind of source is verified and that the tooling is pinned. CONTRIBUTING.md, TESTING.md and own/go-iec60870-5/README.md name the new fields, the govulncheck job and `CONSUMER_RUN`.
+
+The reference images are unchanged in content (same pins); they are rebuilt and published as `v0.6.0`.
+
+---
+
 ## v0.5.0
 
 **Date:** 2026-11-12

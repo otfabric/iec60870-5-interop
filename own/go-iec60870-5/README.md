@@ -60,7 +60,10 @@ AGENTS.md rule 1: nothing under `adapters/`, `fixtures/`, `scripts/`,
 and CI enforces that. This directory and
 `.github/workflows/own-go-iec60870-5.yml` are the one exception. The scripts
 take the image through `ADAPTER_IMAGE_<standard>_otfabric`, and `GATE=otfabric`
-runs only the pairings with it.
+runs only the pairings with it. `CONSUMER_RUN=1` (also set by the Makefile here)
+makes an entry of `tests/<standard>/known-bugs-consumer.tsv` that does not
+reproduce stale: these entries were found with a station or control system
+other than the references, and reproduce with the own images.
 
 No release loop can form (`otfabric/engineering` ADR-0012). The images are
 built by hand, from the latest go-iec60870-5 release, and nothing is
