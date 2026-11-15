@@ -14,13 +14,13 @@
 # versions.yaml.
 
 ARG BASE_REGISTRY=docker.io/library
-ARG GOLANG_DIGEST=sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d
+ARG GOLANG_DIGEST=sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9
 ARG DEBIAN_DIGEST=sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 # ---------------------------------------------------------------------------
 # Stage 1: build the adapter (the upstream module linked in)
 # ---------------------------------------------------------------------------
-FROM ${BASE_REGISTRY}/golang:1.27.2-trixie@${GOLANG_DIGEST} AS build
+FROM ${BASE_REGISTRY}/golang:1.27.4-trixie@${GOLANG_DIGEST} AS build
 
 ARG GOIECP5_VERSION=v0.4.7
 ARG ADAPTER_VERSION=dev

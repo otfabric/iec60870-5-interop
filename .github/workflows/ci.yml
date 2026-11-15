@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      GO_VERSION: "1.27.2"
+      GO_VERSION: "1.27.4"
       GOVULNCHECK_VERSION: v1.9.0
     steps:
       - uses: actions/checkout@v7

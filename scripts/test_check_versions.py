@@ -99,7 +99,7 @@ class CheckVersions(unittest.TestCase):
     def test_a_govulncheck_of_ci_that_versions_yaml_does_not_record_fails(self):
         self.edit(".github/workflows/ci.yml", "GOVULNCHECK_VERSION: v1.9.0", "GOVULNCHECK_VERSION: v1.8.0")
         self.assertFails("ci.yml govulncheck")
-        self.edit(".github/workflows/ci.yml", 'GO_VERSION: "1.27.2"', 'GO_VERSION: "1.26.0"')
+        self.edit(".github/workflows/ci.yml", 'GO_VERSION: "1.27.4"', 'GO_VERSION: "1.26.0"')
         self.assertFails("ci.yml govulncheck Go")
 
 
