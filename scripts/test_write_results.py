@@ -122,5 +122,48 @@ class Records(unittest.TestCase):
         self.assertNotEqual(code, 0)
 
 
+class KnownBugs(unittest.TestCase):
+    """judge_known_bugs of scripts/lib.sh, the end of scripts/interop.sh: which
+    known bug that did not reproduce is stale."""
+
+    ENTRY = "vitusdong@client\t^generic-\tsends INF 0\tvitusdong-inf\thttps://example.com/1\n"
+
+    def judge(self, env, reproduced="", consumer=True):
+        with tempfile.TemporaryDirectory() as d:
+            w = os.path.join(d, "work")
+            os.mkdir(w)
+            for name, text in (("active", self.ENTRY), ("reproduced", reproduced),
+                               ("consumer", "vitusdong-inf\n" if consumer else "")):
+                with open(os.path.join(w, name), "w", newline="") as f:
+                    f.write(text)
+            script = ('set -u; source "%s/lib.sh"; D=%s; results_open t $D "make t"; at a.b x y; ok "a check"; '
+                      'judge_known_bugs %s; finish' % (HERE, d, w))
+            run_env = {k: v for k, v in os.environ.items() if k not in ("GATE", "CONSUMER_RUN")}
+            run_env.update(env)
+            p = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=run_env)
+            with open(os.path.join(d, "results.json")) as f:
+                doc = json.load(f)
+            stale = [r["outcome"] for r in doc["results"] if r["id"] == "waiver.stale"]
+            return p.returncode, stale, [w["reproduced"] for w in doc["waivers"]]
+
+    def test_a_consumer_entry_that_does_not_reproduce_with_the_own_image_is_stale(self):
+        code, stale, waivers = self.judge({"GATE": "otfabric", "CONSUMER_RUN": "1"})
+        self.assertNotEqual(code, 0)
+        self.assertEqual((stale, waivers), (["fail"], [False]))
+
+    def test_a_consumer_entry_is_never_stale_in_a_run_of_the_references(self):
+        self.assertEqual(self.judge({}), (0, [], []))
+        self.assertEqual(self.judge({"GATE": "otfabric"}), (0, [], []))
+
+    def test_a_consumer_entry_that_reproduces_is_a_waiver(self):
+        self.assertEqual(self.judge({"GATE": "otfabric", "CONSUMER_RUN": "1"}, reproduced="sends INF 0\n"),
+                         (0, [], [True]))
+
+    def test_an_entry_of_another_adapter_than_the_gate_is_not_stale(self):
+        self.assertEqual(self.judge({"GATE": "otfabric", "CONSUMER_RUN": "1"}, consumer=False), (0, [], []))
+        code, stale, _ = self.judge({}, consumer=False)
+        self.assertEqual((code != 0, stale), (True, ["fail"]))
+
+
 if __name__ == "__main__":
     unittest.main()

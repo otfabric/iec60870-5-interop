@@ -342,8 +342,10 @@ the consumer run of go-iec60870-5 (`iec103/interop`, 2026-11-11, the same
 images): Open103's control system transferred the fixture's disturbance from
 that library's protection equipment, and vitusdong's control system and
 protection equipment met that library's. What it saw on the wire is in
-`tests/iec103/known-bugs-consumer.tsv` (an entry there cannot reproduce in
-this harness, so `scripts/interop.sh` does not read it):
+`tests/iec103/known-bugs-consumer.tsv` (no run of the references reproduces
+an entry there; `scripts/interop.sh` applies the file, and reports an entry
+that does not reproduce as stale only in a run with OT Fabric's own image,
+`CONSUMER_RUN=1`):
 
 | Known bug | Wire evidence (consumer run) |
 |-----------|------------------------------|
@@ -382,8 +384,8 @@ server, which accepts them; a strict station would not:
 
 The five adapters of iec104-interop v0.6.0, rebuilt here under the new
 names (entrypoint, readiness path, `standard` in capabilities); protocol
-code unchanged. Status in versions.yaml: experimental, because these
-images have not been released from this repository yet.
+code unchanged. Released from this repository since v0.1.0; status in
+versions.yaml: experimental.
 
 | Run | Command | pass | fail | known bug | unsupported |
 |-----|---------|-----:|-----:|----------:|------------:|

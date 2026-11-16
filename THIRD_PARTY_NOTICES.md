@@ -68,7 +68,7 @@ Licence text in the image: `/licenses/j60870/COPYING`.
 |-----------|---------|---------|--------|
 | wendy512/iec104 | v1.0.4, commit `8fb65c83865c94cf37a89d12c9c42dd8c1807cc4` | Apache-2.0 | https://github.com/wendy512/iec104 |
 | wendy512/go-iecp5 (a descendant of thinkgos/go-iecp5) | v1.2.6, commit `2269ee79a5e137847bbdc811be71a1064d303560` | LGPL-3.0 | https://github.com/wendy512/go-iecp5 |
-| Go standard library and runtime | 1.27.2 | BSD-3-Clause | https://go.dev |
+| Go standard library and runtime | 1.27.4 | BSD-3-Clause | https://go.dev |
 | Adapter | this repository, `adapters/iec104/wendy512/` | GPL-3.0-or-later | https://github.com/otfabric/iec60870-5-interop |
 | Base system | Debian trixie-slim | various; see `/usr/share/doc/*/copyright` in the image | https://www.debian.org |
 
@@ -91,7 +91,7 @@ source and build instructions are in this repository, and
 | cloudflare/circl | v1.6.3 | BSD-3-Clause | https://github.com/cloudflare/circl |
 | decred secp256k1 (`github.com/decred/dcrd/dcrec/secp256k1/v4`) | v4.4.0 | ISC | https://github.com/decred/dcrd |
 | golang.org/x/crypto | v0.57.0 | BSD-3-Clause | https://go.googlesource.com/crypto |
-| Go standard library and runtime | 1.27.2 | BSD-3-Clause | https://go.dev |
+| Go standard library and runtime | 1.27.4 | BSD-3-Clause | https://go.dev |
 | Adapter | this repository, `adapters/iec104/cbsigma/` | GPL-3.0-or-later | https://github.com/otfabric/iec60870-5-interop |
 | Base system | Debian trixie-slim | various; see `/usr/share/doc/*/copyright` in the image | https://www.debian.org |
 
@@ -106,7 +106,7 @@ none; `/licenses/GPL-3.0.txt` is the adapter's.
 | Component | Version | Licence | Source |
 |-----------|---------|---------|--------|
 | pascaldekloe/part5 | v0.3.0, commit `1aed6b914f5ce5fd070c0f37d57fc72fe7280a02` | CC0-1.0 (public domain dedication) | https://github.com/pascaldekloe/part5 |
-| Go standard library and runtime | 1.27.2 | BSD-3-Clause | https://go.dev |
+| Go standard library and runtime | 1.27.4 | BSD-3-Clause | https://go.dev |
 | Adapter | this repository, `adapters/iec104/part5/` | GPL-3.0-or-later | https://github.com/otfabric/iec60870-5-interop |
 | Base system | Debian trixie-slim | various; see `/usr/share/doc/*/copyright` in the image | https://www.debian.org |
 

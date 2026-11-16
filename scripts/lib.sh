@@ -62,6 +62,42 @@ fail() { FAIL=$((FAIL + 1)); result fail "$*"; log "FAIL: $*"; return 0; }
 GATE="${GATE:-}"
 gated() { [[ -z "${GATE}" || "$1" == "${GATE}" || "$2" == "${GATE}" ]]; }
 
+# CONSUMER_RUN=1: the run includes a station or control system other than the
+# references, OT Fabric's own image (the Makefile under own/ sets it), with
+# which the entries of tests/<standard>/known-bugs-consumer.tsv reproduce: one
+# that does not is then stale like an entry of known-bugs.tsv. Unset: no
+# reference shows them, and they are never stale.
+CONSUMER_RUN="${CONSUMER_RUN:-}"
+
+# judge_known_bugs <dir>: the end of a cross-stack run. Every known bug of
+# <dir>/active ("<adapter>\t<operation regex>\t<description>\t<waiver id>\t<evidence>"
+# per line) is a waiver that reproduced when its description is in
+# <dir>/reproduced, and otherwise a stale entry, a failure (waiver.stale);
+# except an entry of known-bugs-consumer.tsv (its id in <dir>/consumer) outside
+# a CONSUMER_RUN, and, in a gated run, an entry of an adapter other than the
+# gate, whose pairings may be outside the gate.
+judge_known_bugs() {
+    local dir="$1" bug_adapter bug_text bug_id bug_url consumer
+    RESULT_ID=""
+    while IFS=$'\t' read -r bug_adapter _ bug_text bug_id bug_url; do
+        consumer=""
+        if grep -qxF "${bug_id}" "${dir}/consumer"; then consumer=1; fi
+        if grep -qxF "${bug_text}" "${dir}/reproduced"; then
+            waiver "${bug_id}" "${bug_adapter}" "${bug_url}" true
+        elif [[ -n "${consumer}" && -z "${CONSUMER_RUN}" ]]; then
+            :  # a consumer entry no reference shows: no waiver, not stale
+        elif [[ -z "${consumer}" && -n "${GATE}" && "${bug_adapter%@*}" != "${GATE}" ]]; then
+            :  # the pairings that show it may be outside the gate: not stale
+        else
+            waiver "${bug_id}" "${bug_adapter}" "${bug_url}" false
+            at "${ID_PREFIX:-}waiver.stale"
+            fail "known bug of ${bug_adapter} did not reproduce: ${bug_text}"
+            if [[ -n "${consumer}" ]]; then log "    remove it from tests/${STANDARD}/known-bugs-consumer.tsv"
+            else log "    remove it from tests/known-bugs.tsv; the pin can move to this version"; fi
+        fi
+    done < "${dir}/active"
+}
+
 # image_of <adapter>: ADAPTER_IMAGE_<standard>_<adapter> names an image outside the release
 # set, which this repository's scripts know nothing about.
 image_of() {

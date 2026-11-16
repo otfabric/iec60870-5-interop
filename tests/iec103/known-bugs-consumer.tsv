@@ -3,9 +3,10 @@
 # behaviour: they were seen on the wire against a consumer's own station or
 # control system (a consumer suite, contract 2.3, 2026-11-11;
 # the frames are in docs/COMPATIBILITY.md). Same columns as known-bugs.tsv.
-# scripts/interop.sh applies these entries like known-bugs.tsv but never
-# reports one stale: they reproduce only with a station or control system
-# other than the references, such as OT Fabric's own image (own/). Consumers
+# scripts/interop.sh applies these entries like known-bugs.tsv; it reports
+# one stale only in a run with a station or control system other than the
+# references, OT Fabric's own image (own/, CONSUMER_RUN=1), with which they
+# reproduce. Consumers
 # apply the file together with known-bugs.tsv. An adapter may name a role
 # (<adapter>@client, <adapter>@server) as in tests/iec101/known-bugs.tsv; a
 # consumer that matches adapter names exactly strips it. The clause numbers

@@ -47,10 +47,12 @@ smoke: ## Smoke test the image of STANDARD (IEC 101: every link mode)
 	else scripts/smoke.sh $(STANDARD) otfabric; fi
 
 # GATE=otfabric: only the pairings with our image, not the references among
-# themselves (the harness's own CI runs those).
+# themselves (the harness's own CI runs those). CONSUMER_RUN=1: with our image
+# the entries of tests/<standard>/known-bugs-consumer.tsv reproduce, so one that
+# does not is stale (scripts/lib.sh).
 interop: ## Cross-stack self-test of the image of STANDARD against the references of VERSION
-	@if [ "$(STANDARD)" = iec101 ]; then for m in $(LINK_MODES); do GATE=otfabric LINK_MODE=$$m scripts/interop.sh iec101 otfabric $(REFERENCES_iec101) || exit 1; done; \
-	else GATE=otfabric scripts/interop.sh $(STANDARD) otfabric $(REFERENCES_$(STANDARD)); fi
+	@if [ "$(STANDARD)" = iec101 ]; then for m in $(LINK_MODES); do GATE=otfabric CONSUMER_RUN=1 LINK_MODE=$$m scripts/interop.sh iec101 otfabric $(REFERENCES_iec101) || exit 1; done; \
+	else GATE=otfabric CONSUMER_RUN=1 scripts/interop.sh $(STANDARD) otfabric $(REFERENCES_$(STANDARD)); fi
 
 test: ## go vet and go test of the module (local toolchain)
 	cd own/go-iec60870-5 && go vet ./... && go test ./...

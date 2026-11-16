@@ -82,8 +82,9 @@ for adapter in "${ADAPTERS[@]}"; do
     done < "${KNOWN_BUGS}"
     # tests/<standard>/known-bugs-consumer.tsv: bugs that only a station or a
     # control system other than the references shows (such as OT Fabric's own
-    # image, own/). They waive what they explain like known-bugs.tsv, but an
-    # entry that does not reproduce is not stale: no reference shows it.
+    # image, own/). They waive what they explain like known-bugs.tsv; an
+    # entry that does not reproduce is stale only in a CONSUMER_RUN (with that
+    # image, scripts/lib.sh): no reference shows it.
     [[ -f "${KNOWN_BUGS_CONSUMER}" ]] || continue
     while IFS=$'\t' read -r bug_adapter bug_version bug_regex bug_text bug_id bug_url; do
         [[ -z "${bug_adapter}" || "${bug_adapter}" == \#* ]] && continue
@@ -701,21 +702,7 @@ if ! serial_standard; then
 
 fi
 
-# ---- a known bug that no longer shows is a stale entry ----
-RESULT_ID=""
-while IFS=$'\t' read -r bug_adapter _ bug_text bug_id bug_url; do
-    if grep -qxF "${bug_text}" "${WORK}/reproduced"; then
-        waiver "${bug_id}" "${bug_adapter}" "${bug_url}" true
-    elif grep -qxF "${bug_id}" "${WORK}/consumer"; then
-        :  # a consumer entry no reference shows: no waiver, not stale
-    elif [[ -n "${GATE}" && "${bug_adapter%@*}" != "${GATE}" ]]; then
-        :  # the pairings that show it may be outside the gate: not stale
-    else
-        waiver "${bug_id}" "${bug_adapter}" "${bug_url}" false
-        at "${ID_PREFIX}waiver.stale"
-        fail "known bug of ${bug_adapter} did not reproduce: ${bug_text}"
-        log "    remove it from tests/known-bugs.tsv; the pin can move to this version"
-    fi
-done < "${WORK}/active"
+# ---- a known bug that no longer shows is a stale entry (scripts/lib.sh) ----
+judge_known_bugs "${WORK}"
 
 finish
